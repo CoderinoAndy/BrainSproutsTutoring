@@ -1,16 +1,17 @@
 import os
-import sqlite3
 import secrets
 from datetime import datetime, timedelta
 from functools import wraps
 
 import bcrypt
 import jwt
+import psycopg2
+import psycopg2.extras
 from flask import Flask, request, jsonify, send_from_directory, g
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", secrets.token_hex(32))
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "brainsprouts.db")
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 SKIP_DATES = {"2026-04-29", "2026-05-06", "2026-05-13"}
 MAX_CAPACITY = 15
@@ -19,9 +20,12 @@ MAX_CAPACITY = 15
 
 def get_db():
     if "db" not in g:
-        g.db = sqlite3.connect(DB_PATH)
-        g.db.row_factory = sqlite3.Row
+        g.db = psycopg2.connect(DATABASE_URL)
     return g.db
+
+def get_cursor():
+    db = get_db()
+    return db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
 @app.teardown_appcontext
 def close_db(exc):
@@ -30,48 +34,48 @@ def close_db(exc):
         db.close()
 
 def init_db():
-    db = sqlite3.connect(DB_PATH)
-    db.execute("""
+    conn = psycopg2.connect(DATABASE_URL)
+    cur = conn.cursor()
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
             display_name TEXT NOT NULL,
-            is_admin INTEGER DEFAULT 0,
-            created_at TEXT DEFAULT (datetime('now'))
+            is_admin BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT NOW()
         )
     """)
-    db.execute("""
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS rsvps (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id),
             event_date TEXT NOT NULL,
             status TEXT NOT NULL CHECK(status IN ('yes','maybe','no')),
-            updated_at TEXT DEFAULT (datetime('now')),
-            FOREIGN KEY (user_id) REFERENCES users(id),
+            updated_at TIMESTAMP DEFAULT NOW(),
             UNIQUE(user_id, event_date)
         )
     """)
-
-    db.execute("""
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS announcements (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             title TEXT NOT NULL,
             body TEXT NOT NULL,
-            created_at TEXT DEFAULT (datetime('now'))
+            created_at TIMESTAMP DEFAULT NOW()
         )
     """)
 
     # Seed admin account if not exists
-    existing = db.execute("SELECT id FROM users WHERE username = ?", ("AndyAlbert",)).fetchone()
-    if not existing:
+    cur.execute("SELECT id FROM users WHERE username = %s", ("AndyAlbert",))
+    if not cur.fetchone():
         pw_hash = bcrypt.hashpw("BrainSprouts2000".encode(), bcrypt.gensalt()).decode()
-        db.execute(
-            "INSERT INTO users (username, password_hash, display_name, is_admin) VALUES (?, ?, ?, 1)",
+        cur.execute(
+            "INSERT INTO users (username, password_hash, display_name, is_admin) VALUES (%s, %s, %s, TRUE)",
             ("AndyAlbert", pw_hash, "Andy Albert"),
         )
-    db.commit()
-    db.close()
+    conn.commit()
+    cur.close()
+    conn.close()
 
 # ── Auth helpers ──────────────────────────────────────────────────────────────
 
@@ -115,7 +119,6 @@ def get_wednesday_events():
     start = datetime(2026, 3, 25)
     end = datetime(2026, 6, 30)
     current = start
-    # Advance to first Wednesday
     while current.weekday() != 2:
         current += timedelta(days=1)
     while current <= end:
@@ -149,8 +152,10 @@ def login():
     if not username or not password:
         return jsonify({"error": "Username and password required"}), 400
 
-    db = get_db()
-    user = db.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+    cur = get_cursor()
+    cur.execute("SELECT * FROM users WHERE username = %s", (username,))
+    user = cur.fetchone()
+    cur.close()
     if not user or not bcrypt.checkpw(password.encode(), user["password_hash"].encode()):
         return jsonify({"error": "Invalid credentials"}), 401
 
@@ -170,9 +175,17 @@ def login():
 @app.route("/api/admin/users", methods=["GET"])
 @admin_required
 def list_users():
-    db = get_db()
-    users = db.execute("SELECT id, username, display_name, is_admin, created_at FROM users ORDER BY display_name").fetchall()
-    return jsonify([dict(u) for u in users])
+    cur = get_cursor()
+    cur.execute("SELECT id, username, display_name, is_admin, created_at FROM users ORDER BY display_name")
+    users = cur.fetchall()
+    cur.close()
+    result = []
+    for u in users:
+        row = dict(u)
+        if row.get("created_at"):
+            row["created_at"] = row["created_at"].isoformat()
+        result.append(row)
+    return jsonify(result)
 
 @app.route("/api/admin/users", methods=["POST"])
 @admin_required
@@ -186,41 +199,45 @@ def create_user():
     if len(password) < 6:
         return jsonify({"error": "Password must be at least 6 characters"}), 400
 
-    db = get_db()
-    existing = db.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
-    if existing:
+    cur = get_cursor()
+    cur.execute("SELECT id FROM users WHERE username = %s", (username,))
+    if cur.fetchone():
+        cur.close()
         return jsonify({"error": "Username already exists"}), 409
 
     pw_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-    db.execute(
-        "INSERT INTO users (username, password_hash, display_name) VALUES (?, ?, ?)",
+    cur.execute(
+        "INSERT INTO users (username, password_hash, display_name) VALUES (%s, %s, %s)",
         (username, pw_hash, display_name),
     )
-    db.commit()
+    get_db().commit()
+    cur.close()
     return jsonify({"message": "User created successfully"}), 201
 
 @app.route("/api/admin/users/<int:user_id>", methods=["DELETE"])
 @admin_required
 def delete_user(user_id):
-    db = get_db()
-    db.execute("DELETE FROM rsvps WHERE user_id = ?", (user_id,))
-    db.execute("DELETE FROM users WHERE id = ? AND is_admin = 0", (user_id,))
-    db.commit()
+    cur = get_cursor()
+    cur.execute("DELETE FROM rsvps WHERE user_id = %s", (user_id,))
+    cur.execute("DELETE FROM users WHERE id = %s AND is_admin = FALSE", (user_id,))
+    get_db().commit()
+    cur.close()
     return jsonify({"message": "User deleted"})
 
 @app.route("/api/admin/events", methods=["GET"])
 @admin_required
 def admin_events():
-    db = get_db()
+    cur = get_cursor()
     events = get_wednesday_events()
     result = []
     for date in events:
-        rsvps = db.execute("""
+        cur.execute("""
             SELECT u.display_name, u.username, r.status
             FROM rsvps r JOIN users u ON r.user_id = u.id
-            WHERE r.event_date = ?
+            WHERE r.event_date = %s
             ORDER BY r.status, u.display_name
-        """, (date,)).fetchall()
+        """, (date,))
+        rsvps = cur.fetchall()
         yes_count = sum(1 for r in rsvps if r["status"] == "yes")
         maybe_count = sum(1 for r in rsvps if r["status"] == "maybe")
         no_count = sum(1 for r in rsvps if r["status"] == "no")
@@ -232,6 +249,7 @@ def admin_events():
             "at_capacity": yes_count >= MAX_CAPACITY,
             "rsvps": [dict(r) for r in rsvps],
         })
+    cur.close()
     return jsonify(result)
 
 # ── Routes: Announcements ─────────────────────────────────────────────────────
@@ -239,9 +257,17 @@ def admin_events():
 @app.route("/api/announcements", methods=["GET"])
 @token_required
 def get_announcements():
-    db = get_db()
-    rows = db.execute("SELECT * FROM announcements ORDER BY created_at DESC").fetchall()
-    return jsonify([dict(r) for r in rows])
+    cur = get_cursor()
+    cur.execute("SELECT * FROM announcements ORDER BY created_at DESC")
+    rows = cur.fetchall()
+    cur.close()
+    result = []
+    for r in rows:
+        row = dict(r)
+        if row.get("created_at"):
+            row["created_at"] = row["created_at"].isoformat()
+        result.append(row)
+    return jsonify(result)
 
 @app.route("/api/admin/announcements", methods=["POST"])
 @admin_required
@@ -251,17 +277,19 @@ def create_announcement():
     body = data.get("body", "").strip()
     if not title or not body:
         return jsonify({"error": "Title and body required"}), 400
-    db = get_db()
-    db.execute("INSERT INTO announcements (title, body) VALUES (?, ?)", (title, body))
-    db.commit()
+    cur = get_cursor()
+    cur.execute("INSERT INTO announcements (title, body) VALUES (%s, %s)", (title, body))
+    get_db().commit()
+    cur.close()
     return jsonify({"message": "Announcement posted"}), 201
 
 @app.route("/api/admin/announcements/<int:ann_id>", methods=["DELETE"])
 @admin_required
 def delete_announcement(ann_id):
-    db = get_db()
-    db.execute("DELETE FROM announcements WHERE id = ?", (ann_id,))
-    db.commit()
+    cur = get_cursor()
+    cur.execute("DELETE FROM announcements WHERE id = %s", (ann_id,))
+    get_db().commit()
+    cur.close()
     return jsonify({"message": "Announcement deleted"})
 
 # ── Routes: Calendar / RSVP ──────────────────────────────────────────────────
@@ -269,22 +297,25 @@ def delete_announcement(ann_id):
 @app.route("/api/events", methods=["GET"])
 @token_required
 def get_events():
-    db = get_db()
+    cur = get_cursor()
     events = get_wednesday_events()
-    my_rsvps = db.execute("SELECT event_date, status FROM rsvps WHERE user_id = ?", (g.user_id,)).fetchall()
+    cur.execute("SELECT event_date, status FROM rsvps WHERE user_id = %s", (g.user_id,))
+    my_rsvps = cur.fetchall()
     rsvp_map = {r["event_date"]: r["status"] for r in my_rsvps}
 
     result = []
     for date in events:
-        yes_count = db.execute(
-            "SELECT COUNT(*) as c FROM rsvps WHERE event_date = ? AND status = 'yes'", (date,)
-        ).fetchone()["c"]
+        cur.execute(
+            "SELECT COUNT(*) as c FROM rsvps WHERE event_date = %s AND status = 'yes'", (date,)
+        )
+        yes_count = cur.fetchone()["c"]
         result.append({
             "date": date,
             "my_status": rsvp_map.get(date),
             "yes_count": yes_count,
             "at_capacity": yes_count >= MAX_CAPACITY,
         })
+    cur.close()
     return jsonify(result)
 
 @app.route("/api/rsvp", methods=["POST"])
@@ -298,28 +329,30 @@ def set_rsvp():
     if status not in ("yes", "maybe", "no"):
         return jsonify({"error": "Status must be yes, maybe, or no"}), 400
 
-    db = get_db()
+    cur = get_cursor()
 
-    # Check capacity if trying to RSVP yes
     if status == "yes":
-        yes_count = db.execute(
-            "SELECT COUNT(*) as c FROM rsvps WHERE event_date = ? AND status = 'yes' AND user_id != ?",
+        cur.execute(
+            "SELECT COUNT(*) as c FROM rsvps WHERE event_date = %s AND status = 'yes' AND user_id != %s",
             (event_date, g.user_id),
-        ).fetchone()["c"]
-        if yes_count >= MAX_CAPACITY:
+        )
+        if cur.fetchone()["c"] >= MAX_CAPACITY:
+            cur.close()
             return jsonify({"error": "Event is at full capacity (15/15)"}), 409
 
-    db.execute("""
+    cur.execute("""
         INSERT INTO rsvps (user_id, event_date, status, updated_at)
-        VALUES (?, ?, ?, datetime('now'))
-        ON CONFLICT(user_id, event_date) DO UPDATE SET status = ?, updated_at = datetime('now')
+        VALUES (%s, %s, %s, NOW())
+        ON CONFLICT(user_id, event_date) DO UPDATE SET status = %s, updated_at = NOW()
     """, (g.user_id, event_date, status, status))
-    db.commit()
+    get_db().commit()
+    cur.close()
     return jsonify({"message": "RSVP updated"})
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-init_db()
+if DATABASE_URL:
+    init_db()
 
 if __name__ == "__main__":
     print("BrainSprouts Tutor Management running at http://localhost:5000")
