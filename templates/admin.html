@@ -16,6 +16,7 @@
         </div>
         <div class="nav-right">
             <button class="btn btn-ghost tab-btn active" data-tab="schedule" onclick="switchTab('schedule')">Schedule</button>
+            <button class="btn btn-ghost tab-btn" data-tab="events" onclick="switchTab('events')">Manage Events</button>
             <button class="btn btn-ghost tab-btn" data-tab="announcements" onclick="switchTab('announcements')">Announcements</button>
             <button class="btn btn-ghost tab-btn" data-tab="users" onclick="switchTab('users')">Manage Tutors</button>
             <button class="btn btn-ghost" onclick="logout()">Sign Out</button>
@@ -27,9 +28,108 @@
         <div id="tab-schedule" class="tab-content">
             <div class="page-header">
                 <h2>Session Overview</h2>
-                <p class="text-muted">Wednesday sessions, 4:00 PM - 5:00 PM. View tutor attendance below.</p>
+                <p class="text-muted">View tutor attendance for all scheduled events.</p>
             </div>
             <div id="adminEvents"></div>
+        </div>
+
+        <!-- Manage Events Tab -->
+        <div id="tab-events" class="tab-content" style="display:none;">
+            <div class="page-header">
+                <h2>Manage Events</h2>
+                <p class="text-muted">Add single events, create repeating series, or remove events.</p>
+            </div>
+
+            <!-- Single Event -->
+            <div class="create-user-card">
+                <h3>Add Single Event</h3>
+                <form id="createEventForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="evTitle">Title</label>
+                            <input type="text" id="evTitle" required placeholder="e.g. Tutoring Session" value="Tutoring Session">
+                        </div>
+                        <div class="form-group">
+                            <label for="evDate">Date</label>
+                            <input type="date" id="evDate" required>
+                        </div>
+                    </div>
+                    <div class="form-row" style="margin-top:12px;">
+                        <div class="form-group">
+                            <label for="evStart">Start Time</label>
+                            <input type="time" id="evStart" required value="16:00">
+                        </div>
+                        <div class="form-group">
+                            <label for="evEnd">End Time</label>
+                            <input type="time" id="evEnd" required value="17:00">
+                        </div>
+                        <div class="form-group">
+                            <label for="evCapacity">Max Capacity</label>
+                            <input type="number" id="evCapacity" required value="15" min="1">
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-create">Add Event</button>
+                    </div>
+                </form>
+                <div id="evMsg" class="msg" style="display:none;"></div>
+            </div>
+
+            <!-- Repeating Events -->
+            <div class="create-user-card">
+                <h3>Create Repeating Events</h3>
+                <form id="repeatEventForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="repTitle">Title</label>
+                            <input type="text" id="repTitle" required placeholder="e.g. Tutoring Session" value="Tutoring Session">
+                        </div>
+                        <div class="form-group">
+                            <label for="repDay">Day of Week</label>
+                            <select id="repDay" required class="select-input">
+                                <option value="0">Monday</option>
+                                <option value="1">Tuesday</option>
+                                <option value="2" selected>Wednesday</option>
+                                <option value="3">Thursday</option>
+                                <option value="4">Friday</option>
+                                <option value="5">Saturday</option>
+                                <option value="6">Sunday</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row" style="margin-top:12px;">
+                        <div class="form-group">
+                            <label for="repStartDate">From</label>
+                            <input type="date" id="repStartDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="repEndDate">Until</label>
+                            <input type="date" id="repEndDate" required>
+                        </div>
+                    </div>
+                    <div class="form-row" style="margin-top:12px;">
+                        <div class="form-group">
+                            <label for="repStart">Start Time</label>
+                            <input type="time" id="repStart" required value="16:00">
+                        </div>
+                        <div class="form-group">
+                            <label for="repEnd">End Time</label>
+                            <input type="time" id="repEnd" required value="17:00">
+                        </div>
+                        <div class="form-group">
+                            <label for="repCapacity">Max Capacity</label>
+                            <input type="number" id="repCapacity" required value="15" min="1">
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top:12px;">
+                        <label for="repSkip">Skip Dates <span class="text-muted">(comma-separated, e.g. 2026-04-29, 2026-05-06)</span></label>
+                        <input type="text" id="repSkip" placeholder="Optional">
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width:auto;margin-top:8px;">Create Series</button>
+                </form>
+                <div id="repMsg" class="msg" style="display:none;"></div>
+            </div>
+
+            <!-- Event List -->
+            <div id="eventList"></div>
         </div>
 
         <!-- Users Tab -->
@@ -102,6 +202,27 @@
             return `${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`;
         }
 
+        function fmtTime(t) {
+            const [h, m] = t.split(':');
+            const hr = parseInt(h);
+            const ampm = hr >= 12 ? 'PM' : 'AM';
+            const h12 = hr % 12 || 12;
+            return `${h12}:${m} ${ampm}`;
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function showMsg(el, ok, text) {
+            el.style.display = 'block';
+            el.className = ok ? 'msg msg-success' : 'msg msg-error';
+            el.textContent = text;
+            setTimeout(() => el.style.display = 'none', 3000);
+        }
+
         // ── Tabs ──
 
         function switchTab(tab) {
@@ -109,8 +230,9 @@
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
             document.getElementById('tab-' + tab).style.display = 'block';
             document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
-            if (tab === 'users') loadUsers();
             if (tab === 'schedule') loadAdminEvents();
+            if (tab === 'events') loadEventList();
+            if (tab === 'users') loadUsers();
             if (tab === 'announcements') loadAnnouncements();
         }
 
@@ -127,6 +249,10 @@
 
         function renderAdminEvents(events) {
             const container = document.getElementById('adminEvents');
+            if (events.length === 0) {
+                container.innerHTML = '<p class="text-muted">No events scheduled. Go to Manage Events to add some.</p>';
+                return;
+            }
             const byMonth = {};
             events.forEach(ev => {
                 const month = ev.date.substring(0, 7);
@@ -144,19 +270,20 @@
                     const yesRsvps = ev.rsvps.filter(r => r.status === 'yes');
                     const maybeRsvps = ev.rsvps.filter(r => r.status === 'maybe');
                     const noRsvps = ev.rsvps.filter(r => r.status === 'no');
+                    const spotsLeft = ev.max_capacity - ev.yes_count;
 
                     html += `
                     <div class="admin-event-card ${isPast ? 'event-past' : ''}">
                         <div class="admin-event-header">
                             <div>
                                 <div class="event-date">${formatDate(ev.date)}</div>
-                                <div class="event-time">4:00 PM - 5:00 PM &middot; Tutoring Session</div>
+                                <div class="event-time">${fmtTime(ev.start_time)} - ${fmtTime(ev.end_time)} &middot; ${escapeHtml(ev.title)}</div>
                             </div>
                             <div class="admin-counts">
                                 <span class="count-badge count-yes">${ev.yes_count} Yes</span>
                                 <span class="count-badge count-maybe">${ev.maybe_count} Maybe</span>
                                 <span class="count-badge count-no">${ev.no_count} No</span>
-                                ${ev.at_capacity ? '<span class="capacity-full">FULL</span>' : `<span class="spots-info">${15 - ev.yes_count} spots left</span>`}
+                                ${ev.at_capacity ? '<span class="capacity-full">FULL</span>' : `<span class="spots-info">${spotsLeft} spots left</span>`}
                             </div>
                         </div>
                         ${ev.rsvps.length > 0 ? `
@@ -181,6 +308,87 @@
             container.innerHTML = html;
         }
 
+        // ── Manage Events ──
+
+        async function loadEventList() {
+            const res = await fetch('/api/admin/events', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            const events = await res.json();
+            const container = document.getElementById('eventList');
+            if (events.length === 0) {
+                container.innerHTML = '<p class="text-muted" style="margin-top:16px;">No events yet.</p>';
+                return;
+            }
+            let html = '<h3 style="margin-top:24px;">All Events</h3><div class="users-table" style="margin-top:8px;">';
+            html += `<div class="table-header table-5col">
+                <span>Date</span><span>Title</span><span>Time</span><span>Capacity</span><span></span>
+            </div>`;
+            events.forEach(ev => {
+                html += `<div class="table-row table-5col">
+                    <span class="user-name">${formatDate(ev.date)}</span>
+                    <span>${escapeHtml(ev.title)}</span>
+                    <span class="text-muted">${fmtTime(ev.start_time)} - ${fmtTime(ev.end_time)}</span>
+                    <span class="text-muted">${ev.yes_count}/${ev.max_capacity}</span>
+                    <span><button class="btn btn-danger-ghost" onclick="deleteEvent(${ev.id}, '${ev.date}')">Delete</button></span>
+                </div>`;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        document.getElementById('createEventForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const msgEl = document.getElementById('evMsg');
+            const res = await fetch('/api/admin/events', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({
+                    title: document.getElementById('evTitle').value,
+                    event_date: document.getElementById('evDate').value,
+                    start_time: document.getElementById('evStart').value,
+                    end_time: document.getElementById('evEnd').value,
+                    max_capacity: parseInt(document.getElementById('evCapacity').value),
+                }),
+            });
+            const data = await res.json();
+            showMsg(msgEl, res.ok, data.message || data.error);
+            if (res.ok) { document.getElementById('evDate').value = ''; loadEventList(); }
+        });
+
+        document.getElementById('repeatEventForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const msgEl = document.getElementById('repMsg');
+            const skipRaw = document.getElementById('repSkip').value.trim();
+            const skipDates = skipRaw ? skipRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+            const res = await fetch('/api/admin/events/repeat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({
+                    title: document.getElementById('repTitle').value,
+                    day_of_week: parseInt(document.getElementById('repDay').value),
+                    start_date: document.getElementById('repStartDate').value,
+                    end_date: document.getElementById('repEndDate').value,
+                    start_time: document.getElementById('repStart').value,
+                    end_time: document.getElementById('repEnd').value,
+                    max_capacity: parseInt(document.getElementById('repCapacity').value),
+                    skip_dates: skipDates,
+                }),
+            });
+            const data = await res.json();
+            showMsg(msgEl, res.ok, data.message || data.error);
+            if (res.ok) { document.getElementById('repeatEventForm').reset(); loadEventList(); }
+        });
+
+        async function deleteEvent(id, date) {
+            if (!confirm(`Delete the event on ${date}? This will also remove all RSVPs for it.`)) return;
+            await fetch(`/api/admin/events/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': 'Bearer ' + token },
+            });
+            loadEventList();
+        }
+
         // ── Users ──
 
         async function loadUsers() {
@@ -197,7 +405,7 @@
                 html += `<div class="table-row">
                     <span class="user-name">${u.display_name} ${u.is_admin ? '<span class="nav-badge">Admin</span>' : ''}</span>
                     <span class="text-muted">${u.username}</span>
-                    <span class="text-muted">${u.created_at ? u.created_at.split(' ')[0] : ''}</span>
+                    <span class="text-muted">${u.created_at ? u.created_at.split('T')[0] : ''}</span>
                     <span>${!u.is_admin ? `<button class="btn btn-danger-ghost" onclick="deleteUser(${u.id}, '${u.display_name}')">Remove</button>` : ''}</span>
                 </div>`;
             });
@@ -210,10 +418,7 @@
             const msgEl = document.getElementById('createMsg');
             const res = await fetch('/api/admin/users', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + token,
-                },
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
                 body: JSON.stringify({
                     display_name: document.getElementById('newDisplay').value,
                     username: document.getElementById('newUsername').value,
@@ -221,17 +426,8 @@
                 }),
             });
             const data = await res.json();
-            msgEl.style.display = 'block';
-            if (res.ok) {
-                msgEl.className = 'msg msg-success';
-                msgEl.textContent = 'Account created successfully!';
-                document.getElementById('createUserForm').reset();
-                loadUsers();
-            } else {
-                msgEl.className = 'msg msg-error';
-                msgEl.textContent = data.error || 'Failed to create account';
-            }
-            setTimeout(() => msgEl.style.display = 'none', 3000);
+            showMsg(msgEl, res.ok, res.ok ? 'Account created successfully!' : (data.error || 'Failed'));
+            if (res.ok) { document.getElementById('createUserForm').reset(); loadUsers(); }
         });
 
         async function deleteUser(id, name) {
@@ -273,38 +469,20 @@
             container.innerHTML = html;
         }
 
-        function escapeHtml(str) {
-            const div = document.createElement('div');
-            div.textContent = str;
-            return div.innerHTML;
-        }
-
         document.getElementById('createAnnForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const msgEl = document.getElementById('annMsg');
             const res = await fetch('/api/admin/announcements', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + token,
-                },
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
                 body: JSON.stringify({
                     title: document.getElementById('annTitle').value,
                     body: document.getElementById('annBody').value,
                 }),
             });
             const data = await res.json();
-            msgEl.style.display = 'block';
-            if (res.ok) {
-                msgEl.className = 'msg msg-success';
-                msgEl.textContent = 'Announcement posted!';
-                document.getElementById('createAnnForm').reset();
-                loadAnnouncements();
-            } else {
-                msgEl.className = 'msg msg-error';
-                msgEl.textContent = data.error || 'Failed to post';
-            }
-            setTimeout(() => msgEl.style.display = 'none', 3000);
+            showMsg(msgEl, res.ok, res.ok ? 'Announcement posted!' : (data.error || 'Failed'));
+            if (res.ok) { document.getElementById('createAnnForm').reset(); loadAnnouncements(); }
         });
 
         async function deleteAnnouncement(id) {

@@ -17,14 +17,11 @@ if USE_PG:
     import psycopg2
     import psycopg2.extras
 
-SKIP_DATES = {"2026-04-29", "2026-05-06", "2026-05-13"}
-MAX_CAPACITY = 15
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "brainsprouts.db")
 
 # ── Database helpers ──────────────────────────────────────────────────────────
 
 class DictRow(dict):
-    """Make sqlite3.Row results accessible like dicts."""
     pass
 
 def _sqlite_dict_factory(cursor, row):
@@ -55,16 +52,52 @@ def close_db(exc):
     if db is not None:
         db.close()
 
-def _param(sql):
+def _p(sql):
     """Convert %s placeholders to ? for SQLite."""
     if USE_PG:
         return sql
     return sql.replace("%s", "?")
 
+def now_expr():
+    return "NOW()" if USE_PG else "datetime('now')"
+
+def serialize_row(row):
+    d = dict(row)
+    for key in ("created_at", "updated_at"):
+        val = d.get(key)
+        if val and hasattr(val, "isoformat"):
+            d[key] = val.isoformat()
+    return d
+
+# ── Seed Wednesday events ─────────────────────────────────────────────────────
+
+SKIP_DATES = {"2026-04-29", "2026-05-06", "2026-05-13"}
+
+def _seed_wednesday_events(cur):
+    """Insert the original Wednesday events if the events table is empty."""
+    cur.execute("SELECT COUNT(*) as c FROM events")
+    if cur.fetchone()["c"] > 0:
+        return
+    start = datetime(2026, 3, 25)
+    end = datetime(2026, 6, 30)
+    current = start
+    while current.weekday() != 2:
+        current += timedelta(days=1)
+    while current <= end:
+        date_str = current.strftime("%Y-%m-%d")
+        if date_str not in SKIP_DATES:
+            cur.execute(
+                _p("INSERT INTO events (title, event_date, start_time, end_time, max_capacity) VALUES (%s, %s, %s, %s, %s)"),
+                ("Tutoring Session", date_str, "16:00", "17:00", 15),
+            )
+        current += timedelta(days=7)
+
+# ── DB init ───────────────────────────────────────────────────────────────────
+
 def init_db():
     if USE_PG:
         conn = psycopg2.connect(DATABASE_URL)
-        cur = conn.cursor()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -72,6 +105,17 @@ def init_db():
                 password_hash TEXT NOT NULL,
                 display_name TEXT NOT NULL,
                 is_admin BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS events (
+                id SERIAL PRIMARY KEY,
+                title TEXT NOT NULL,
+                event_date TEXT NOT NULL,
+                start_time TEXT NOT NULL,
+                end_time TEXT NOT NULL,
+                max_capacity INTEGER NOT NULL DEFAULT 15,
                 created_at TIMESTAMP DEFAULT NOW()
             )
         """)
@@ -100,8 +144,10 @@ def init_db():
                 "INSERT INTO users (username, password_hash, display_name, is_admin) VALUES (%s, %s, %s, TRUE)",
                 ("AndyAlbert", pw_hash, "Andy Albert"),
             )
+        _seed_wednesday_events(cur)
     else:
         conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = _sqlite_dict_factory
         cur = conn.cursor()
         cur.execute("""
             CREATE TABLE IF NOT EXISTS users (
@@ -110,6 +156,17 @@ def init_db():
                 password_hash TEXT NOT NULL,
                 display_name TEXT NOT NULL,
                 is_admin INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                event_date TEXT NOT NULL,
+                start_time TEXT NOT NULL,
+                end_time TEXT NOT NULL,
+                max_capacity INTEGER NOT NULL DEFAULT 15,
                 created_at TEXT DEFAULT (datetime('now'))
             )
         """)
@@ -139,6 +196,7 @@ def init_db():
                 "INSERT INTO users (username, password_hash, display_name, is_admin) VALUES (?, ?, ?, 1)",
                 ("AndyAlbert", pw_hash, "Andy Albert"),
             )
+        _seed_wednesday_events(cur)
     conn.commit()
     cur.close()
     conn.close()
@@ -178,35 +236,17 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# ── Helper: get all event dates from DB ───────────────────────────────────────
 
-def now_expr():
-    return "NOW()" if USE_PG else "datetime('now')"
+def get_event_dates(cur):
+    """Return list of event_date strings from the events table, sorted."""
+    cur.execute("SELECT event_date FROM events ORDER BY event_date")
+    return [r["event_date"] for r in cur.fetchall()]
 
-def serialize_row(row):
-    """Ensure datetime fields are strings for JSON."""
-    d = dict(row)
-    for key in ("created_at", "updated_at"):
-        val = d.get(key)
-        if val and hasattr(val, "isoformat"):
-            d[key] = val.isoformat()
-    return d
-
-# ── Event generation ──────────────────────────────────────────────────────────
-
-def get_wednesday_events():
-    events = []
-    start = datetime(2026, 3, 25)
-    end = datetime(2026, 6, 30)
-    current = start
-    while current.weekday() != 2:
-        current += timedelta(days=1)
-    while current <= end:
-        date_str = current.strftime("%Y-%m-%d")
-        if date_str not in SKIP_DATES:
-            events.append(date_str)
-        current += timedelta(days=7)
-    return events
+def get_event_map(cur):
+    """Return dict of event_date -> event row."""
+    cur.execute("SELECT * FROM events ORDER BY event_date")
+    return {r["event_date"]: r for r in cur.fetchall()}
 
 # ── Routes: Static ────────────────────────────────────────────────────────────
 
@@ -233,7 +273,7 @@ def login():
         return jsonify({"error": "Username and password required"}), 400
 
     cur = get_cursor()
-    cur.execute(_param("SELECT * FROM users WHERE username = %s"), (username,))
+    cur.execute(_p("SELECT * FROM users WHERE username = %s"), (username,))
     user = cur.fetchone()
     cur.close()
     if not user or not bcrypt.checkpw(password.encode(), user["password_hash"].encode()):
@@ -250,7 +290,7 @@ def login():
         },
     })
 
-# ── Routes: Admin ─────────────────────────────────────────────────────────────
+# ── Routes: Admin Users ──────────────────────────────────────────────────────
 
 @app.route("/api/admin/users", methods=["GET"])
 @admin_required
@@ -274,14 +314,14 @@ def create_user():
         return jsonify({"error": "Password must be at least 6 characters"}), 400
 
     cur = get_cursor()
-    cur.execute(_param("SELECT id FROM users WHERE username = %s"), (username,))
+    cur.execute(_p("SELECT id FROM users WHERE username = %s"), (username,))
     if cur.fetchone():
         cur.close()
         return jsonify({"error": "Username already exists"}), 409
 
     pw_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
     cur.execute(
-        _param("INSERT INTO users (username, password_hash, display_name) VALUES (%s, %s, %s)"),
+        _p("INSERT INTO users (username, password_hash, display_name) VALUES (%s, %s, %s)"),
         (username, pw_hash, display_name),
     )
     get_db().commit()
@@ -292,23 +332,25 @@ def create_user():
 @admin_required
 def delete_user(user_id):
     cur = get_cursor()
-    cur.execute(_param("DELETE FROM rsvps WHERE user_id = %s"), (user_id,))
+    cur.execute(_p("DELETE FROM rsvps WHERE user_id = %s"), (user_id,))
     if USE_PG:
-        cur.execute(_param("DELETE FROM users WHERE id = %s AND is_admin = FALSE"), (user_id,))
+        cur.execute(_p("DELETE FROM users WHERE id = %s AND is_admin = FALSE"), (user_id,))
     else:
         cur.execute("DELETE FROM users WHERE id = ? AND is_admin = 0", (user_id,))
     get_db().commit()
     cur.close()
     return jsonify({"message": "User deleted"})
 
+# ── Routes: Admin Events ─────────────────────────────────────────────────────
+
 @app.route("/api/admin/events", methods=["GET"])
 @admin_required
 def admin_events():
     cur = get_cursor()
-    events = get_wednesday_events()
+    event_map = get_event_map(cur)
     result = []
-    for date in events:
-        cur.execute(_param("""
+    for date, ev in event_map.items():
+        cur.execute(_p("""
             SELECT u.display_name, u.username, r.status
             FROM rsvps r JOIN users u ON r.user_id = u.id
             WHERE r.event_date = %s
@@ -319,15 +361,116 @@ def admin_events():
         maybe_count = sum(1 for r in rsvps if r["status"] == "maybe")
         no_count = sum(1 for r in rsvps if r["status"] == "no")
         result.append({
+            "id": ev["id"],
             "date": date,
+            "title": ev["title"],
+            "start_time": ev["start_time"],
+            "end_time": ev["end_time"],
+            "max_capacity": ev["max_capacity"],
             "yes_count": yes_count,
             "maybe_count": maybe_count,
             "no_count": no_count,
-            "at_capacity": yes_count >= MAX_CAPACITY,
+            "at_capacity": yes_count >= ev["max_capacity"],
             "rsvps": [dict(r) for r in rsvps],
         })
     cur.close()
     return jsonify(result)
+
+@app.route("/api/admin/events", methods=["POST"])
+@admin_required
+def create_event():
+    data = request.get_json()
+    title = data.get("title", "").strip()
+    event_date = data.get("event_date", "").strip()
+    start_time = data.get("start_time", "").strip()
+    end_time = data.get("end_time", "").strip()
+    max_capacity = data.get("max_capacity", 15)
+    if not title or not event_date or not start_time or not end_time:
+        return jsonify({"error": "All fields required"}), 400
+    try:
+        datetime.strptime(event_date, "%Y-%m-%d")
+    except ValueError:
+        return jsonify({"error": "Invalid date format (use YYYY-MM-DD)"}), 400
+
+    cur = get_cursor()
+    cur.execute(_p("SELECT id FROM events WHERE event_date = %s"), (event_date,))
+    if cur.fetchone():
+        cur.close()
+        return jsonify({"error": "An event already exists on this date"}), 409
+
+    cur.execute(
+        _p("INSERT INTO events (title, event_date, start_time, end_time, max_capacity) VALUES (%s, %s, %s, %s, %s)"),
+        (title, event_date, start_time, end_time, int(max_capacity)),
+    )
+    get_db().commit()
+    cur.close()
+    return jsonify({"message": "Event created"}), 201
+
+@app.route("/api/admin/events/repeat", methods=["POST"])
+@admin_required
+def create_repeating_events():
+    data = request.get_json()
+    title = data.get("title", "").strip()
+    start_date = data.get("start_date", "").strip()
+    end_date = data.get("end_date", "").strip()
+    day_of_week = data.get("day_of_week")  # 0=Mon, 6=Sun
+    start_time = data.get("start_time", "").strip()
+    end_time = data.get("end_time", "").strip()
+    max_capacity = data.get("max_capacity", 15)
+    skip_dates = set(data.get("skip_dates", []))
+
+    if not all([title, start_date, end_date, start_time, end_time, day_of_week is not None]):
+        return jsonify({"error": "All fields required"}), 400
+    try:
+        sd = datetime.strptime(start_date, "%Y-%m-%d")
+        ed = datetime.strptime(end_date, "%Y-%m-%d")
+        day_of_week = int(day_of_week)
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid date or day_of_week"}), 400
+    if day_of_week < 0 or day_of_week > 6:
+        return jsonify({"error": "day_of_week must be 0 (Mon) to 6 (Sun)"}), 400
+
+    cur = get_cursor()
+    current = sd
+    # Advance to first matching day
+    while current.weekday() != day_of_week:
+        current += timedelta(days=1)
+
+    created = 0
+    skipped = 0
+    while current <= ed:
+        date_str = current.strftime("%Y-%m-%d")
+        current += timedelta(days=7)
+        if date_str in skip_dates:
+            skipped += 1
+            continue
+        cur.execute(_p("SELECT id FROM events WHERE event_date = %s"), (date_str,))
+        if cur.fetchone():
+            skipped += 1
+            continue
+        cur.execute(
+            _p("INSERT INTO events (title, event_date, start_time, end_time, max_capacity) VALUES (%s, %s, %s, %s, %s)"),
+            (title, date_str, start_time, end_time, int(max_capacity)),
+        )
+        created += 1
+
+    get_db().commit()
+    cur.close()
+    return jsonify({"message": f"{created} events created, {skipped} skipped (duplicates or excluded)"}), 201
+
+@app.route("/api/admin/events/<int:event_id>", methods=["DELETE"])
+@admin_required
+def delete_event(event_id):
+    cur = get_cursor()
+    # Get the event date so we can clean up RSVPs
+    cur.execute(_p("SELECT event_date FROM events WHERE id = %s"), (event_id,))
+    ev = cur.fetchone()
+    if ev:
+        cur.execute(_p("DELETE FROM rsvps WHERE event_date = %s"), (ev["event_date"],))
+    cur.execute(_p("DELETE FROM events WHERE id = %s"), (event_id,))
+    get_db().commit()
+    cur.close()
+    return jsonify({"message": "Event deleted"})
 
 # ── Routes: Announcements ─────────────────────────────────────────────────────
 
@@ -349,7 +492,7 @@ def create_announcement():
     if not title or not body:
         return jsonify({"error": "Title and body required"}), 400
     cur = get_cursor()
-    cur.execute(_param("INSERT INTO announcements (title, body) VALUES (%s, %s)"), (title, body))
+    cur.execute(_p("INSERT INTO announcements (title, body) VALUES (%s, %s)"), (title, body))
     get_db().commit()
     cur.close()
     return jsonify({"message": "Announcement posted"}), 201
@@ -358,33 +501,37 @@ def create_announcement():
 @admin_required
 def delete_announcement(ann_id):
     cur = get_cursor()
-    cur.execute(_param("DELETE FROM announcements WHERE id = %s"), (ann_id,))
+    cur.execute(_p("DELETE FROM announcements WHERE id = %s"), (ann_id,))
     get_db().commit()
     cur.close()
     return jsonify({"message": "Announcement deleted"})
 
-# ── Routes: Calendar / RSVP ──────────────────────────────────────────────────
+# ── Routes: Calendar / RSVP (tutor-facing) ───────────────────────────────────
 
 @app.route("/api/events", methods=["GET"])
 @token_required
 def get_events():
     cur = get_cursor()
-    events = get_wednesday_events()
-    cur.execute(_param("SELECT event_date, status FROM rsvps WHERE user_id = %s"), (g.user_id,))
+    event_map = get_event_map(cur)
+    cur.execute(_p("SELECT event_date, status FROM rsvps WHERE user_id = %s"), (g.user_id,))
     my_rsvps = cur.fetchall()
     rsvp_map = {r["event_date"]: r["status"] for r in my_rsvps}
 
     result = []
-    for date in events:
+    for date, ev in event_map.items():
         cur.execute(
-            _param("SELECT COUNT(*) as c FROM rsvps WHERE event_date = %s AND status = 'yes'"), (date,)
+            _p("SELECT COUNT(*) as c FROM rsvps WHERE event_date = %s AND status = 'yes'"), (date,)
         )
         yes_count = cur.fetchone()["c"]
         result.append({
             "date": date,
+            "title": ev["title"],
+            "start_time": ev["start_time"],
+            "end_time": ev["end_time"],
+            "max_capacity": ev["max_capacity"],
             "my_status": rsvp_map.get(date),
             "yes_count": yes_count,
-            "at_capacity": yes_count >= MAX_CAPACITY,
+            "at_capacity": yes_count >= ev["max_capacity"],
         })
     cur.close()
     return jsonify(result)
@@ -395,21 +542,25 @@ def set_rsvp():
     data = request.get_json()
     event_date = data.get("date", "")
     status = data.get("status", "")
-    if event_date not in get_wednesday_events():
-        return jsonify({"error": "Invalid event date"}), 400
-    if status not in ("yes", "maybe", "no"):
-        return jsonify({"error": "Status must be yes, maybe, or no"}), 400
 
     cur = get_cursor()
+    cur.execute(_p("SELECT * FROM events WHERE event_date = %s"), (event_date,))
+    ev = cur.fetchone()
+    if not ev:
+        cur.close()
+        return jsonify({"error": "Invalid event date"}), 400
+    if status not in ("yes", "maybe", "no"):
+        cur.close()
+        return jsonify({"error": "Status must be yes, maybe, or no"}), 400
 
     if status == "yes":
         cur.execute(
-            _param("SELECT COUNT(*) as c FROM rsvps WHERE event_date = %s AND status = 'yes' AND user_id != %s"),
+            _p("SELECT COUNT(*) as c FROM rsvps WHERE event_date = %s AND status = 'yes' AND user_id != %s"),
             (event_date, g.user_id),
         )
-        if cur.fetchone()["c"] >= MAX_CAPACITY:
+        if cur.fetchone()["c"] >= ev["max_capacity"]:
             cur.close()
-            return jsonify({"error": "Event is at full capacity (15/15)"}), 409
+            return jsonify({"error": f"Event is at full capacity ({ev['max_capacity']}/{ev['max_capacity']})"}), 409
 
     nw = now_expr()
     if USE_PG:
