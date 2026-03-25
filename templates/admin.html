@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BrainSprouts - Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-left">
+            <span class="nav-brand">BrainSprouts</span>
+            <span class="nav-badge">Admin</span>
+        </div>
+        <div class="nav-right">
+            <button class="btn btn-ghost tab-btn active" data-tab="schedule" onclick="switchTab('schedule')">Schedule</button>
+            <button class="btn btn-ghost tab-btn" data-tab="announcements" onclick="switchTab('announcements')">Announcements</button>
+            <button class="btn btn-ghost tab-btn" data-tab="users" onclick="switchTab('users')">Manage Tutors</button>
+            <button class="btn btn-ghost" onclick="logout()">Sign Out</button>
+        </div>
+    </nav>
+
+    <main class="container">
+        <!-- Schedule Tab -->
+        <div id="tab-schedule" class="tab-content">
+            <div class="page-header">
+                <h2>Session Overview</h2>
+                <p class="text-muted">Wednesday sessions, 4:00 PM - 5:00 PM. View tutor attendance below.</p>
+            </div>
+            <div id="adminEvents"></div>
+        </div>
+
+        <!-- Users Tab -->
+        <div id="tab-users" class="tab-content" style="display:none;">
+            <div class="page-header">
+                <h2>Manage Tutors</h2>
+                <p class="text-muted">Create login credentials for tutors. They can sign in immediately.</p>
+            </div>
+
+            <div class="create-user-card">
+                <h3>Create New Tutor Account</h3>
+                <form id="createUserForm" class="form-row">
+                    <div class="form-group">
+                        <label for="newDisplay">Display Name</label>
+                        <input type="text" id="newDisplay" required placeholder="e.g. Jane Smith">
+                    </div>
+                    <div class="form-group">
+                        <label for="newUsername">Username</label>
+                        <input type="text" id="newUsername" required placeholder="e.g. jsmith">
+                    </div>
+                    <div class="form-group">
+                        <label for="newPassword">Password</label>
+                        <input type="text" id="newPassword" required placeholder="Min 6 characters">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-create">Create Account</button>
+                </form>
+                <div id="createMsg" class="msg" style="display:none;"></div>
+            </div>
+
+            <div class="users-list" id="usersList"></div>
+        </div>
+
+        <!-- Announcements Tab -->
+        <div id="tab-announcements" class="tab-content" style="display:none;">
+            <div class="page-header">
+                <h2>Announcements</h2>
+                <p class="text-muted">Post announcements visible to all tutors on their dashboard.</p>
+            </div>
+
+            <div class="create-user-card">
+                <h3>Post New Announcement</h3>
+                <form id="createAnnForm">
+                    <div class="form-group">
+                        <label for="annTitle">Title</label>
+                        <input type="text" id="annTitle" required placeholder="e.g. Schedule Change Next Week">
+                    </div>
+                    <div class="form-group">
+                        <label for="annBody">Message</label>
+                        <textarea id="annBody" required placeholder="Write your announcement here..." rows="3" class="textarea"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width:auto;">Post Announcement</button>
+                </form>
+                <div id="annMsg" class="msg" style="display:none;"></div>
+            </div>
+
+            <div id="annList"></div>
+        </div>
+    </main>
+
+    <script>
+        const token = localStorage.getItem('bs_token');
+        const user = JSON.parse(localStorage.getItem('bs_user') || 'null');
+        if (!token || !user || !user.is_admin) { window.location.href = '/'; }
+
+        const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+        function formatDate(dateStr) {
+            const d = new Date(dateStr + 'T12:00:00');
+            return `${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`;
+        }
+
+        // ── Tabs ──
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById('tab-' + tab).style.display = 'block';
+            document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+            if (tab === 'users') loadUsers();
+            if (tab === 'schedule') loadAdminEvents();
+            if (tab === 'announcements') loadAnnouncements();
+        }
+
+        // ── Schedule ──
+
+        async function loadAdminEvents() {
+            const res = await fetch('/api/admin/events', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if (res.status === 401 || res.status === 403) { logout(); return; }
+            const events = await res.json();
+            renderAdminEvents(events);
+        }
+
+        function renderAdminEvents(events) {
+            const container = document.getElementById('adminEvents');
+            const byMonth = {};
+            events.forEach(ev => {
+                const month = ev.date.substring(0, 7);
+                if (!byMonth[month]) byMonth[month] = [];
+                byMonth[month].push(ev);
+            });
+
+            let html = '';
+            for (const [month, evts] of Object.entries(byMonth)) {
+                const d = new Date(month + '-15');
+                html += `<div class="month-section">
+                    <h3 class="month-title">${MONTHS[d.getMonth()]} ${d.getFullYear()}</h3>`;
+                evts.forEach(ev => {
+                    const isPast = new Date(ev.date + 'T23:59:59') < new Date();
+                    const yesRsvps = ev.rsvps.filter(r => r.status === 'yes');
+                    const maybeRsvps = ev.rsvps.filter(r => r.status === 'maybe');
+                    const noRsvps = ev.rsvps.filter(r => r.status === 'no');
+
+                    html += `
+                    <div class="admin-event-card ${isPast ? 'event-past' : ''}">
+                        <div class="admin-event-header">
+                            <div>
+                                <div class="event-date">${formatDate(ev.date)}</div>
+                                <div class="event-time">4:00 PM - 5:00 PM &middot; Tutoring Session</div>
+                            </div>
+                            <div class="admin-counts">
+                                <span class="count-badge count-yes">${ev.yes_count} Yes</span>
+                                <span class="count-badge count-maybe">${ev.maybe_count} Maybe</span>
+                                <span class="count-badge count-no">${ev.no_count} No</span>
+                                ${ev.at_capacity ? '<span class="capacity-full">FULL</span>' : `<span class="spots-info">${15 - ev.yes_count} spots left</span>`}
+                            </div>
+                        </div>
+                        ${ev.rsvps.length > 0 ? `
+                        <div class="rsvp-details">
+                            ${yesRsvps.length > 0 ? `<div class="rsvp-group">
+                                <div class="rsvp-group-label status-yes-text">Attending</div>
+                                ${yesRsvps.map(r => `<span class="rsvp-name">${r.display_name}</span>`).join('')}
+                            </div>` : ''}
+                            ${maybeRsvps.length > 0 ? `<div class="rsvp-group">
+                                <div class="rsvp-group-label status-maybe-text">Maybe</div>
+                                ${maybeRsvps.map(r => `<span class="rsvp-name">${r.display_name}</span>`).join('')}
+                            </div>` : ''}
+                            ${noRsvps.length > 0 ? `<div class="rsvp-group">
+                                <div class="rsvp-group-label status-no-text">Not Attending</div>
+                                ${noRsvps.map(r => `<span class="rsvp-name">${r.display_name}</span>`).join('')}
+                            </div>` : ''}
+                        </div>` : '<div class="rsvp-details"><span class="text-muted">No responses yet</span></div>'}
+                    </div>`;
+                });
+                html += `</div>`;
+            }
+            container.innerHTML = html;
+        }
+
+        // ── Users ──
+
+        async function loadUsers() {
+            const res = await fetch('/api/admin/users', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            const users = await res.json();
+            const list = document.getElementById('usersList');
+            let html = '<h3>Current Tutors</h3><div class="users-table">';
+            html += `<div class="table-header">
+                <span>Name</span><span>Username</span><span>Created</span><span></span>
+            </div>`;
+            users.forEach(u => {
+                html += `<div class="table-row">
+                    <span class="user-name">${u.display_name} ${u.is_admin ? '<span class="nav-badge">Admin</span>' : ''}</span>
+                    <span class="text-muted">${u.username}</span>
+                    <span class="text-muted">${u.created_at ? u.created_at.split(' ')[0] : ''}</span>
+                    <span>${!u.is_admin ? `<button class="btn btn-danger-ghost" onclick="deleteUser(${u.id}, '${u.display_name}')">Remove</button>` : ''}</span>
+                </div>`;
+            });
+            html += '</div>';
+            list.innerHTML = html;
+        }
+
+        document.getElementById('createUserForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const msgEl = document.getElementById('createMsg');
+            const res = await fetch('/api/admin/users', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token,
+                },
+                body: JSON.stringify({
+                    display_name: document.getElementById('newDisplay').value,
+                    username: document.getElementById('newUsername').value,
+                    password: document.getElementById('newPassword').value,
+                }),
+            });
+            const data = await res.json();
+            msgEl.style.display = 'block';
+            if (res.ok) {
+                msgEl.className = 'msg msg-success';
+                msgEl.textContent = 'Account created successfully!';
+                document.getElementById('createUserForm').reset();
+                loadUsers();
+            } else {
+                msgEl.className = 'msg msg-error';
+                msgEl.textContent = data.error || 'Failed to create account';
+            }
+            setTimeout(() => msgEl.style.display = 'none', 3000);
+        });
+
+        async function deleteUser(id, name) {
+            if (!confirm(`Remove ${name}? This will also delete their RSVP history.`)) return;
+            await fetch(`/api/admin/users/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': 'Bearer ' + token },
+            });
+            loadUsers();
+        }
+
+        // ── Announcements ──
+
+        async function loadAnnouncements() {
+            const res = await fetch('/api/announcements', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            const anns = await res.json();
+            const container = document.getElementById('annList');
+            if (anns.length === 0) {
+                container.innerHTML = '<p class="text-muted" style="margin-top:16px;">No announcements yet.</p>';
+                return;
+            }
+            let html = '<h3 style="margin-top:24px;">Previous Announcements</h3>';
+            anns.forEach(a => {
+                const date = new Date(a.created_at + 'Z');
+                const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                html += `<div class="announcement-card" style="margin-top:8px;">
+                    <div class="ann-header">
+                        <span class="ann-title">${escapeHtml(a.title)}</span>
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <span class="ann-date">${dateStr}</span>
+                            <button class="btn btn-danger-ghost" onclick="deleteAnnouncement(${a.id})">Delete</button>
+                        </div>
+                    </div>
+                    <p class="ann-body">${escapeHtml(a.body)}</p>
+                </div>`;
+            });
+            container.innerHTML = html;
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        document.getElementById('createAnnForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const msgEl = document.getElementById('annMsg');
+            const res = await fetch('/api/admin/announcements', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token,
+                },
+                body: JSON.stringify({
+                    title: document.getElementById('annTitle').value,
+                    body: document.getElementById('annBody').value,
+                }),
+            });
+            const data = await res.json();
+            msgEl.style.display = 'block';
+            if (res.ok) {
+                msgEl.className = 'msg msg-success';
+                msgEl.textContent = 'Announcement posted!';
+                document.getElementById('createAnnForm').reset();
+                loadAnnouncements();
+            } else {
+                msgEl.className = 'msg msg-error';
+                msgEl.textContent = data.error || 'Failed to post';
+            }
+            setTimeout(() => msgEl.style.display = 'none', 3000);
+        });
+
+        async function deleteAnnouncement(id) {
+            if (!confirm('Delete this announcement?')) return;
+            await fetch(`/api/admin/announcements/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': 'Bearer ' + token },
+            });
+            loadAnnouncements();
+        }
+
+        function logout() {
+            localStorage.removeItem('bs_token');
+            localStorage.removeItem('bs_user');
+            window.location.href = '/';
+        }
+
+        loadAdminEvents();
+    </script>
+</body>
+</html>

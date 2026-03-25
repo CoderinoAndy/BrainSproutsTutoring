@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BrainSprouts - Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="login-body">
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-logo">
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                    <circle cx="24" cy="24" r="24" fill="#16a34a" opacity="0.12"/>
+                    <path d="M24 12c-4 0-8 3-8 8 0 3 1.5 5 3 6.5V32a2 2 0 002 2h6a2 2 0 002-2v-5.5c1.5-1.5 3-3.5 3-6.5 0-5-4-8-8-8z" fill="#16a34a"/>
+                    <circle cx="21" cy="21" r="1.5" fill="white"/>
+                    <circle cx="27" cy="21" r="1.5" fill="white"/>
+                    <path d="M20 36h8M21 38h6" stroke="#16a34a" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+            </div>
+            <h1>BrainSprouts</h1>
+            <p class="subtitle">Tutor Management</p>
+
+            <form id="loginForm" autocomplete="off">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required autofocus placeholder="Enter your username">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required placeholder="Enter your password">
+                </div>
+                <div id="errorMsg" class="error-msg" style="display:none;"></div>
+                <button type="submit" class="btn btn-primary" id="loginBtn">Sign In</button>
+            </form>
+        </div>
+        <p class="footer-text">BrainSprouts Non-Profit</p>
+    </div>
+
+    <script>
+        // Redirect if already logged in
+        const token = localStorage.getItem('bs_token');
+        const user = JSON.parse(localStorage.getItem('bs_user') || 'null');
+        if (token && user) {
+            window.location.href = user.is_admin ? '/admin' : '/dashboard';
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('loginBtn');
+            const errEl = document.getElementById('errorMsg');
+            errEl.style.display = 'none';
+            btn.disabled = true;
+            btn.textContent = 'Signing in...';
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: document.getElementById('username').value,
+                        password: document.getElementById('password').value,
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    errEl.textContent = data.error || 'Login failed';
+                    errEl.style.display = 'block';
+                    return;
+                }
+                localStorage.setItem('bs_token', data.token);
+                localStorage.setItem('bs_user', JSON.stringify(data.user));
+                window.location.href = data.user.is_admin ? '/admin' : '/dashboard';
+            } catch (err) {
+                errEl.textContent = 'Connection error. Please try again.';
+                errEl.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Sign In';
+            }
+        });
+    </script>
+</body>
+</html>
