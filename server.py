@@ -1,31 +1,53 @@
 import os
+import sqlite3
 import secrets
 from datetime import datetime, timedelta
 from functools import wraps
 
 import bcrypt
 import jwt
-import psycopg2
-import psycopg2.extras
 from flask import Flask, request, jsonify, send_from_directory, g
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 DATABASE_URL = os.environ.get("DATABASE_URL")
+USE_PG = bool(DATABASE_URL)
+
+if USE_PG:
+    import psycopg2
+    import psycopg2.extras
 
 SKIP_DATES = {"2026-04-29", "2026-05-06", "2026-05-13"}
 MAX_CAPACITY = 15
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "brainsprouts.db")
 
 # ── Database helpers ──────────────────────────────────────────────────────────
 
+class DictRow(dict):
+    """Make sqlite3.Row results accessible like dicts."""
+    pass
+
+def _sqlite_dict_factory(cursor, row):
+    d = DictRow()
+    for idx, col in enumerate(cursor.description):
+        d[col[0]] = row[idx]
+    return d
+
 def get_db():
     if "db" not in g:
-        g.db = psycopg2.connect(DATABASE_URL)
+        if USE_PG:
+            g.db = psycopg2.connect(DATABASE_URL)
+        else:
+            g.db = sqlite3.connect(DB_PATH)
+            g.db.row_factory = _sqlite_dict_factory
     return g.db
 
 def get_cursor():
     db = get_db()
-    return db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    if USE_PG:
+        return db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    else:
+        return db.cursor()
 
 @app.teardown_appcontext
 def close_db(exc):
@@ -33,46 +55,90 @@ def close_db(exc):
     if db is not None:
         db.close()
 
-def init_db():
-    conn = psycopg2.connect(DATABASE_URL)
-    cur = conn.cursor()
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
-            username TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            display_name TEXT NOT NULL,
-            is_admin BOOLEAN DEFAULT FALSE,
-            created_at TIMESTAMP DEFAULT NOW()
-        )
-    """)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS rsvps (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL REFERENCES users(id),
-            event_date TEXT NOT NULL,
-            status TEXT NOT NULL CHECK(status IN ('yes','maybe','no')),
-            updated_at TIMESTAMP DEFAULT NOW(),
-            UNIQUE(user_id, event_date)
-        )
-    """)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS announcements (
-            id SERIAL PRIMARY KEY,
-            title TEXT NOT NULL,
-            body TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT NOW()
-        )
-    """)
+def _param(sql):
+    """Convert %s placeholders to ? for SQLite."""
+    if USE_PG:
+        return sql
+    return sql.replace("%s", "?")
 
-    # Seed admin account if not exists
-    cur.execute("SELECT id FROM users WHERE username = %s", ("AndyAlbert",))
-    if not cur.fetchone():
-        pw_hash = bcrypt.hashpw("BrainSprouts2000".encode(), bcrypt.gensalt()).decode()
-        cur.execute(
-            "INSERT INTO users (username, password_hash, display_name, is_admin) VALUES (%s, %s, %s, TRUE)",
-            ("AndyAlbert", pw_hash, "Andy Albert"),
-        )
+def init_db():
+    if USE_PG:
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                display_name TEXT NOT NULL,
+                is_admin BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS rsvps (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id),
+                event_date TEXT NOT NULL,
+                status TEXT NOT NULL CHECK(status IN ('yes','maybe','no')),
+                updated_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE(user_id, event_date)
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS announcements (
+                id SERIAL PRIMARY KEY,
+                title TEXT NOT NULL,
+                body TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
+        cur.execute("SELECT id FROM users WHERE username = %s", ("AndyAlbert",))
+        if not cur.fetchone():
+            pw_hash = bcrypt.hashpw("BrainSprouts2000".encode(), bcrypt.gensalt()).decode()
+            cur.execute(
+                "INSERT INTO users (username, password_hash, display_name, is_admin) VALUES (%s, %s, %s, TRUE)",
+                ("AndyAlbert", pw_hash, "Andy Albert"),
+            )
+    else:
+        conn = sqlite3.connect(DB_PATH)
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                display_name TEXT NOT NULL,
+                is_admin INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS rsvps (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                event_date TEXT NOT NULL,
+                status TEXT NOT NULL CHECK(status IN ('yes','maybe','no')),
+                updated_at TEXT DEFAULT (datetime('now')),
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                UNIQUE(user_id, event_date)
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS announcements (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                body TEXT NOT NULL,
+                created_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        cur.execute("SELECT id FROM users WHERE username = ?", ("AndyAlbert",))
+        if not cur.fetchone():
+            pw_hash = bcrypt.hashpw("BrainSprouts2000".encode(), bcrypt.gensalt()).decode()
+            cur.execute(
+                "INSERT INTO users (username, password_hash, display_name, is_admin) VALUES (?, ?, ?, 1)",
+                ("AndyAlbert", pw_hash, "Andy Albert"),
+            )
     conn.commit()
     cur.close()
     conn.close()
@@ -111,6 +177,20 @@ def admin_required(f):
             return jsonify({"error": "Admin access required"}), 403
         return f(*args, **kwargs)
     return decorated
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def now_expr():
+    return "NOW()" if USE_PG else "datetime('now')"
+
+def serialize_row(row):
+    """Ensure datetime fields are strings for JSON."""
+    d = dict(row)
+    for key in ("created_at", "updated_at"):
+        val = d.get(key)
+        if val and hasattr(val, "isoformat"):
+            d[key] = val.isoformat()
+    return d
 
 # ── Event generation ──────────────────────────────────────────────────────────
 
@@ -153,7 +233,7 @@ def login():
         return jsonify({"error": "Username and password required"}), 400
 
     cur = get_cursor()
-    cur.execute("SELECT * FROM users WHERE username = %s", (username,))
+    cur.execute(_param("SELECT * FROM users WHERE username = %s"), (username,))
     user = cur.fetchone()
     cur.close()
     if not user or not bcrypt.checkpw(password.encode(), user["password_hash"].encode()):
@@ -179,13 +259,7 @@ def list_users():
     cur.execute("SELECT id, username, display_name, is_admin, created_at FROM users ORDER BY display_name")
     users = cur.fetchall()
     cur.close()
-    result = []
-    for u in users:
-        row = dict(u)
-        if row.get("created_at"):
-            row["created_at"] = row["created_at"].isoformat()
-        result.append(row)
-    return jsonify(result)
+    return jsonify([serialize_row(u) for u in users])
 
 @app.route("/api/admin/users", methods=["POST"])
 @admin_required
@@ -200,14 +274,14 @@ def create_user():
         return jsonify({"error": "Password must be at least 6 characters"}), 400
 
     cur = get_cursor()
-    cur.execute("SELECT id FROM users WHERE username = %s", (username,))
+    cur.execute(_param("SELECT id FROM users WHERE username = %s"), (username,))
     if cur.fetchone():
         cur.close()
         return jsonify({"error": "Username already exists"}), 409
 
     pw_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
     cur.execute(
-        "INSERT INTO users (username, password_hash, display_name) VALUES (%s, %s, %s)",
+        _param("INSERT INTO users (username, password_hash, display_name) VALUES (%s, %s, %s)"),
         (username, pw_hash, display_name),
     )
     get_db().commit()
@@ -218,8 +292,11 @@ def create_user():
 @admin_required
 def delete_user(user_id):
     cur = get_cursor()
-    cur.execute("DELETE FROM rsvps WHERE user_id = %s", (user_id,))
-    cur.execute("DELETE FROM users WHERE id = %s AND is_admin = FALSE", (user_id,))
+    cur.execute(_param("DELETE FROM rsvps WHERE user_id = %s"), (user_id,))
+    if USE_PG:
+        cur.execute(_param("DELETE FROM users WHERE id = %s AND is_admin = FALSE"), (user_id,))
+    else:
+        cur.execute("DELETE FROM users WHERE id = ? AND is_admin = 0", (user_id,))
     get_db().commit()
     cur.close()
     return jsonify({"message": "User deleted"})
@@ -231,12 +308,12 @@ def admin_events():
     events = get_wednesday_events()
     result = []
     for date in events:
-        cur.execute("""
+        cur.execute(_param("""
             SELECT u.display_name, u.username, r.status
             FROM rsvps r JOIN users u ON r.user_id = u.id
             WHERE r.event_date = %s
             ORDER BY r.status, u.display_name
-        """, (date,))
+        """), (date,))
         rsvps = cur.fetchall()
         yes_count = sum(1 for r in rsvps if r["status"] == "yes")
         maybe_count = sum(1 for r in rsvps if r["status"] == "maybe")
@@ -261,13 +338,7 @@ def get_announcements():
     cur.execute("SELECT * FROM announcements ORDER BY created_at DESC")
     rows = cur.fetchall()
     cur.close()
-    result = []
-    for r in rows:
-        row = dict(r)
-        if row.get("created_at"):
-            row["created_at"] = row["created_at"].isoformat()
-        result.append(row)
-    return jsonify(result)
+    return jsonify([serialize_row(r) for r in rows])
 
 @app.route("/api/admin/announcements", methods=["POST"])
 @admin_required
@@ -278,7 +349,7 @@ def create_announcement():
     if not title or not body:
         return jsonify({"error": "Title and body required"}), 400
     cur = get_cursor()
-    cur.execute("INSERT INTO announcements (title, body) VALUES (%s, %s)", (title, body))
+    cur.execute(_param("INSERT INTO announcements (title, body) VALUES (%s, %s)"), (title, body))
     get_db().commit()
     cur.close()
     return jsonify({"message": "Announcement posted"}), 201
@@ -287,7 +358,7 @@ def create_announcement():
 @admin_required
 def delete_announcement(ann_id):
     cur = get_cursor()
-    cur.execute("DELETE FROM announcements WHERE id = %s", (ann_id,))
+    cur.execute(_param("DELETE FROM announcements WHERE id = %s"), (ann_id,))
     get_db().commit()
     cur.close()
     return jsonify({"message": "Announcement deleted"})
@@ -299,14 +370,14 @@ def delete_announcement(ann_id):
 def get_events():
     cur = get_cursor()
     events = get_wednesday_events()
-    cur.execute("SELECT event_date, status FROM rsvps WHERE user_id = %s", (g.user_id,))
+    cur.execute(_param("SELECT event_date, status FROM rsvps WHERE user_id = %s"), (g.user_id,))
     my_rsvps = cur.fetchall()
     rsvp_map = {r["event_date"]: r["status"] for r in my_rsvps}
 
     result = []
     for date in events:
         cur.execute(
-            "SELECT COUNT(*) as c FROM rsvps WHERE event_date = %s AND status = 'yes'", (date,)
+            _param("SELECT COUNT(*) as c FROM rsvps WHERE event_date = %s AND status = 'yes'"), (date,)
         )
         yes_count = cur.fetchone()["c"]
         result.append({
@@ -333,27 +404,35 @@ def set_rsvp():
 
     if status == "yes":
         cur.execute(
-            "SELECT COUNT(*) as c FROM rsvps WHERE event_date = %s AND status = 'yes' AND user_id != %s",
+            _param("SELECT COUNT(*) as c FROM rsvps WHERE event_date = %s AND status = 'yes' AND user_id != %s"),
             (event_date, g.user_id),
         )
         if cur.fetchone()["c"] >= MAX_CAPACITY:
             cur.close()
             return jsonify({"error": "Event is at full capacity (15/15)"}), 409
 
-    cur.execute("""
-        INSERT INTO rsvps (user_id, event_date, status, updated_at)
-        VALUES (%s, %s, %s, NOW())
-        ON CONFLICT(user_id, event_date) DO UPDATE SET status = %s, updated_at = NOW()
-    """, (g.user_id, event_date, status, status))
+    nw = now_expr()
+    if USE_PG:
+        cur.execute(f"""
+            INSERT INTO rsvps (user_id, event_date, status, updated_at)
+            VALUES (%s, %s, %s, {nw})
+            ON CONFLICT(user_id, event_date) DO UPDATE SET status = %s, updated_at = {nw}
+        """, (g.user_id, event_date, status, status))
+    else:
+        cur.execute(f"""
+            INSERT INTO rsvps (user_id, event_date, status, updated_at)
+            VALUES (?, ?, ?, {nw})
+            ON CONFLICT(user_id, event_date) DO UPDATE SET status = ?, updated_at = {nw}
+        """, (g.user_id, event_date, status, status))
     get_db().commit()
     cur.close()
     return jsonify({"message": "RSVP updated"})
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-if DATABASE_URL:
-    init_db()
+init_db()
 
 if __name__ == "__main__":
-    print("BrainSprouts Tutor Management running at http://localhost:5000")
+    mode = "PostgreSQL" if USE_PG else "SQLite (local)"
+    print(f"BrainSprouts Tutor Management running at http://localhost:5000 [{mode}]")
     app.run(debug=True, port=5000)
