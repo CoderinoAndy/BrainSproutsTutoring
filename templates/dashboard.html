@@ -30,6 +30,15 @@
         <div class="calendar-grid" id="calendarGrid">
             <!-- Populated by JS -->
         </div>
+
+        <!-- My Hours Section -->
+        <div style="margin-top:40px;">
+            <div class="page-header">
+                <h2>My Hours</h2>
+                <p class="text-muted">Hours logged by the administrator for your work.</p>
+            </div>
+            <div id="myHoursSection"></div>
+        </div>
     </main>
 
     <script>
@@ -183,8 +192,43 @@
             return div.innerHTML;
         }
 
+        async function loadMyHours() {
+            const res = await fetch('/api/hours', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if (!res.ok) return;
+            const hours = await res.json();
+            const container = document.getElementById('myHoursSection');
+
+            if (hours.length === 0) {
+                container.innerHTML = '<p class="text-muted">No hours logged yet.</p>';
+                return;
+            }
+
+            const total = hours.reduce((sum, h) => sum + h.hours, 0);
+
+            let html = `<div class="hours-summary">
+                <span class="hours-total-label">Total Hours:</span>
+                <span class="hours-total-value">${total.toFixed(1)}</span>
+            </div>`;
+
+            html += '<div class="hours-list">';
+            hours.forEach(h => {
+                html += `<div class="hours-entry">
+                    <div class="hours-entry-info">
+                        <div class="event-date">${formatDate(h.work_date)}</div>
+                        <div class="event-time">${escapeHtml(h.description || 'No description')}</div>
+                    </div>
+                    <div class="hours-entry-value">${h.hours}h</div>
+                </div>`;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
         loadEvents();
         loadAnnouncements();
+        loadMyHours();
     </script>
 </body>
 </html>

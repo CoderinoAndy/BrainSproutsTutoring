@@ -137,6 +137,16 @@ def init_db():
                 created_at TIMESTAMP DEFAULT NOW()
             )
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS hours (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id),
+                work_date TEXT NOT NULL,
+                hours REAL NOT NULL,
+                description TEXT NOT NULL DEFAULT '',
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
         cur.execute("SELECT id FROM users WHERE username = %s", ("AndyAlbert",))
         if not cur.fetchone():
             pw_hash = bcrypt.hashpw("BrainSprouts2000".encode(), bcrypt.gensalt()).decode()
@@ -187,6 +197,17 @@ def init_db():
                 title TEXT NOT NULL,
                 body TEXT NOT NULL,
                 created_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS hours (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                work_date TEXT NOT NULL,
+                hours REAL NOT NULL,
+                description TEXT NOT NULL DEFAULT '',
+                created_at TEXT DEFAULT (datetime('now')),
+                FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """)
         cur.execute("SELECT id FROM users WHERE username = ?", ("AndyAlbert",))
@@ -578,6 +599,104 @@ def set_rsvp():
     get_db().commit()
     cur.close()
     return jsonify({"message": "RSVP updated"})
+
+# ── Routes: Hours (tutor-facing) ──────────────────────────────────────────────
+
+@app.route("/api/hours", methods=["GET"])
+@token_required
+def get_my_hours():
+    cur = get_cursor()
+    cur.execute(_p("""
+        SELECT h.id, h.work_date, h.hours, h.description, h.created_at
+        FROM hours h
+        WHERE h.user_id = %s
+        ORDER BY h.work_date DESC
+    """), (g.user_id,))
+    rows = cur.fetchall()
+    cur.close()
+    return jsonify([serialize_row(r) for r in rows])
+
+# ── Routes: Admin Hours ──────────────────────────────────────────────────────
+
+@app.route("/api/admin/hours", methods=["GET"])
+@admin_required
+def admin_get_hours():
+    cur = get_cursor()
+    cur.execute("""
+        SELECT h.id, h.user_id, h.work_date, h.hours, h.description, h.created_at,
+               u.display_name
+        FROM hours h JOIN users u ON h.user_id = u.id
+        ORDER BY h.work_date DESC, u.display_name
+    """)
+    rows = cur.fetchall()
+    cur.close()
+    return jsonify([serialize_row(r) for r in rows])
+
+@app.route("/api/admin/hours", methods=["POST"])
+@admin_required
+def create_hours():
+    data = request.get_json()
+    user_id = data.get("user_id")
+    work_date = data.get("work_date", "").strip()
+    hours = data.get("hours")
+    description = data.get("description", "").strip()
+
+    if not user_id or not work_date or hours is None:
+        return jsonify({"error": "Tutor, date, and hours are required"}), 400
+    try:
+        hours = float(hours)
+        if hours <= 0:
+            raise ValueError
+    except (ValueError, TypeError):
+        return jsonify({"error": "Hours must be a positive number"}), 400
+    try:
+        datetime.strptime(work_date, "%Y-%m-%d")
+    except ValueError:
+        return jsonify({"error": "Invalid date format"}), 400
+
+    cur = get_cursor()
+    cur.execute(
+        _p("INSERT INTO hours (user_id, work_date, hours, description) VALUES (%s, %s, %s, %s)"),
+        (int(user_id), work_date, hours, description),
+    )
+    get_db().commit()
+    cur.close()
+    return jsonify({"message": "Hours logged successfully"}), 201
+
+@app.route("/api/admin/hours/<int:hour_id>", methods=["PUT"])
+@admin_required
+def update_hours(hour_id):
+    data = request.get_json()
+    work_date = data.get("work_date", "").strip()
+    hours = data.get("hours")
+    description = data.get("description", "").strip()
+
+    if not work_date or hours is None:
+        return jsonify({"error": "Date and hours are required"}), 400
+    try:
+        hours = float(hours)
+        if hours <= 0:
+            raise ValueError
+    except (ValueError, TypeError):
+        return jsonify({"error": "Hours must be a positive number"}), 400
+
+    cur = get_cursor()
+    cur.execute(
+        _p("UPDATE hours SET work_date = %s, hours = %s, description = %s WHERE id = %s"),
+        (work_date, hours, description, hour_id),
+    )
+    get_db().commit()
+    cur.close()
+    return jsonify({"message": "Hours updated"})
+
+@app.route("/api/admin/hours/<int:hour_id>", methods=["DELETE"])
+@admin_required
+def delete_hours(hour_id):
+    cur = get_cursor()
+    cur.execute(_p("DELETE FROM hours WHERE id = %s"), (hour_id,))
+    get_db().commit()
+    cur.close()
+    return jsonify({"message": "Hours deleted"})
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 

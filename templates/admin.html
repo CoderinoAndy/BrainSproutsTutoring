@@ -19,6 +19,7 @@
             <button class="btn btn-ghost tab-btn" data-tab="events" onclick="switchTab('events')">Manage Events</button>
             <button class="btn btn-ghost tab-btn" data-tab="announcements" onclick="switchTab('announcements')">Announcements</button>
             <button class="btn btn-ghost tab-btn" data-tab="users" onclick="switchTab('users')">Manage Tutors</button>
+            <button class="btn btn-ghost tab-btn" data-tab="hours" onclick="switchTab('hours')">Hours</button>
             <button class="btn btn-ghost" onclick="logout()">Sign Out</button>
         </div>
     </nav>
@@ -187,6 +188,52 @@
 
             <div id="annList"></div>
         </div>
+
+        <!-- Hours Tab -->
+        <div id="tab-hours" class="tab-content" style="display:none;">
+            <div class="page-header">
+                <h2>Hour Tracker</h2>
+                <p class="text-muted">Log and manage tutor hours.</p>
+            </div>
+
+            <div class="create-user-card">
+                <h3>Log Hours</h3>
+                <form id="logHoursForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="hrTutor">Tutor</label>
+                            <select id="hrTutor" required class="select-input">
+                                <option value="">Select a tutor...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="hrDate">Date</label>
+                            <input type="date" id="hrDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="hrHours">Hours</label>
+                            <input type="number" id="hrHours" required min="0.25" step="0.25" placeholder="e.g. 1.5">
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top:12px;">
+                        <label for="hrDesc">Description <span class="text-muted">(optional)</span></label>
+                        <input type="text" id="hrDesc" placeholder="e.g. Tutoring session, Training, etc.">
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width:auto;margin-top:8px;">Log Hours</button>
+                </form>
+                <div id="hrMsg" class="msg" style="display:none;"></div>
+            </div>
+
+            <!-- Filter by tutor -->
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+                <label style="font-size:13px;font-weight:600;color:var(--gray-700);">Filter by tutor:</label>
+                <select id="hrFilter" class="select-input" style="width:auto;min-width:200px;">
+                    <option value="">All Tutors</option>
+                </select>
+            </div>
+
+            <div id="hoursList"></div>
+        </div>
     </main>
 
     <script>
@@ -234,6 +281,7 @@
             if (tab === 'events') loadEventList();
             if (tab === 'users') loadUsers();
             if (tab === 'announcements') loadAnnouncements();
+            if (tab === 'hours') { loadHoursTutorDropdowns(); loadHours(); }
         }
 
         // ── Schedule ──
@@ -492,6 +540,141 @@
                 headers: { 'Authorization': 'Bearer ' + token },
             });
             loadAnnouncements();
+        }
+
+        // ── Hours ──
+
+        let allHours = [];
+
+        async function loadHoursTutorDropdowns() {
+            const res = await fetch('/api/admin/users', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            const users = await res.json();
+            const tutors = users.filter(u => !u.is_admin);
+            const sel = document.getElementById('hrTutor');
+            const filt = document.getElementById('hrFilter');
+            // Preserve current selections
+            const curSel = sel.value;
+            const curFilt = filt.value;
+            sel.innerHTML = '<option value="">Select a tutor...</option>';
+            filt.innerHTML = '<option value="">All Tutors</option>';
+            tutors.forEach(u => {
+                sel.innerHTML += `<option value="${u.id}">${escapeHtml(u.display_name)}</option>`;
+                filt.innerHTML += `<option value="${u.id}">${escapeHtml(u.display_name)}</option>`;
+            });
+            if (curSel) sel.value = curSel;
+            if (curFilt) filt.value = curFilt;
+        }
+
+        async function loadHours() {
+            const res = await fetch('/api/admin/hours', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            allHours = await res.json();
+            renderHours();
+        }
+
+        function renderHours() {
+            const filter = document.getElementById('hrFilter').value;
+            const filtered = filter ? allHours.filter(h => String(h.user_id) === filter) : allHours;
+            const container = document.getElementById('hoursList');
+
+            // Calculate total
+            const totalHours = filtered.reduce((sum, h) => sum + h.hours, 0);
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<p class="text-muted">No hours logged yet.</p>';
+                return;
+            }
+
+            let html = `<div class="hours-summary">
+                <span class="hours-total-label">Total Hours:</span>
+                <span class="hours-total-value">${totalHours.toFixed(1)}</span>
+            </div>`;
+
+            html += '<div class="users-table" style="margin-top:12px;"><div class="table-header table-hours">';
+            html += '<span>Tutor</span><span>Date</span><span>Hours</span><span>Description</span><span></span>';
+            html += '</div>';
+
+            filtered.forEach(h => {
+                html += `<div class="table-row table-hours" id="hour-row-${h.id}">
+                    <span class="user-name">${escapeHtml(h.display_name)}</span>
+                    <span>${formatDate(h.work_date)}</span>
+                    <span>${h.hours}</span>
+                    <span class="text-muted">${escapeHtml(h.description || '—')}</span>
+                    <span style="display:flex;gap:4px;">
+                        <button class="btn btn-danger-ghost" style="border-color:var(--gray-300);color:var(--gray-600);" onclick="editHour(${h.id})">Edit</button>
+                        <button class="btn btn-danger-ghost" onclick="deleteHour(${h.id})">Delete</button>
+                    </span>
+                </div>`;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        document.getElementById('hrFilter').addEventListener('change', renderHours);
+
+        document.getElementById('logHoursForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const msgEl = document.getElementById('hrMsg');
+            const res = await fetch('/api/admin/hours', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({
+                    user_id: parseInt(document.getElementById('hrTutor').value),
+                    work_date: document.getElementById('hrDate').value,
+                    hours: parseFloat(document.getElementById('hrHours').value),
+                    description: document.getElementById('hrDesc').value,
+                }),
+            });
+            const data = await res.json();
+            showMsg(msgEl, res.ok, res.ok ? 'Hours logged!' : (data.error || 'Failed'));
+            if (res.ok) {
+                document.getElementById('hrDate').value = '';
+                document.getElementById('hrHours').value = '';
+                document.getElementById('hrDesc').value = '';
+                loadHours();
+            }
+        });
+
+        function editHour(id) {
+            const h = allHours.find(x => x.id === id);
+            if (!h) return;
+            const row = document.getElementById('hour-row-' + id);
+            row.innerHTML = `
+                <span class="user-name">${escapeHtml(h.display_name)}</span>
+                <span><input type="date" id="editDate-${id}" value="${h.work_date}" style="padding:4px 8px;border:1px solid var(--gray-300);border-radius:4px;font-family:inherit;font-size:13px;"></span>
+                <span><input type="number" id="editHours-${id}" value="${h.hours}" min="0.25" step="0.25" style="width:70px;padding:4px 8px;border:1px solid var(--gray-300);border-radius:4px;font-family:inherit;font-size:13px;"></span>
+                <span><input type="text" id="editDesc-${id}" value="${escapeHtml(h.description || '')}" style="width:100%;padding:4px 8px;border:1px solid var(--gray-300);border-radius:4px;font-family:inherit;font-size:13px;"></span>
+                <span style="display:flex;gap:4px;">
+                    <button class="btn btn-danger-ghost" style="border-color:var(--green-600);color:var(--green-700);" onclick="saveHour(${id})">Save</button>
+                    <button class="btn btn-danger-ghost" style="border-color:var(--gray-300);color:var(--gray-600);" onclick="renderHours()">Cancel</button>
+                </span>
+            `;
+        }
+
+        async function saveHour(id) {
+            const res = await fetch(`/api/admin/hours/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({
+                    work_date: document.getElementById('editDate-' + id).value,
+                    hours: parseFloat(document.getElementById('editHours-' + id).value),
+                    description: document.getElementById('editDesc-' + id).value,
+                }),
+            });
+            if (res.ok) loadHours();
+            else alert('Failed to update');
+        }
+
+        async function deleteHour(id) {
+            if (!confirm('Delete this hour entry?')) return;
+            await fetch(`/api/admin/hours/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': 'Bearer ' + token },
+            });
+            loadHours();
         }
 
         function logout() {
