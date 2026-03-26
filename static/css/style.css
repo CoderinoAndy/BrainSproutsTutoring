@@ -614,6 +614,119 @@ body {
     grid-template-columns: 1.4fr 1fr 1fr 0.6fr 80px;
 }
 
+/* ── Navbar Hours Badge ────────────────────────────────────────────────────── */
+.nav-hours-badge {
+    display: inline-flex;
+    align-items: center;
+    background: var(--green-100);
+    color: var(--green-700);
+    font-size: 13px;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 100px;
+    letter-spacing: -0.01em;
+}
+
+/* ── Title Card (fixed right) ─────────────────────────────────────────────── */
+.title-card {
+    position: fixed;
+    top: 80px;
+    right: 24px;
+    width: 180px;
+    background: white;
+    border: 1px solid var(--green-200);
+    border-radius: var(--radius);
+    padding: 20px;
+    text-align: center;
+    box-shadow: var(--shadow-md);
+    z-index: 40;
+}
+
+.title-card-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--gray-400);
+    margin-bottom: 6px;
+}
+
+.title-card-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--green-700);
+    margin-bottom: 4px;
+}
+
+.title-card-name {
+    font-size: 12px;
+    color: var(--gray-500);
+}
+
+/* ── Multi-select ─────────────────────────────────────────────────────────── */
+.multi-select {
+    position: relative;
+}
+
+.multi-select-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-sm);
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--gray-900);
+    background: white;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.multi-select-toggle:hover {
+    border-color: var(--green-400);
+}
+
+.multi-select-dropdown {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-md);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 100;
+}
+
+.multi-select-dropdown.open {
+    display: block;
+}
+
+.multi-select-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+.multi-select-item:hover {
+    background: var(--green-50);
+}
+
+.multi-select-item input[type="checkbox"] {
+    accent-color: var(--green-600);
+    width: 16px;
+    height: 16px;
+}
+
 /* ── Hours Tracker ─────────────────────────────────────────────────────────── */
 .hours-summary {
     display: flex;
@@ -693,6 +806,7 @@ body {
     .table-5col span:nth-child(4) { display: none; }
     .table-hours { grid-template-columns: 1fr 0.6fr 0.4fr 80px; }
     .table-hours span:nth-child(4) { display: none; }
+    .title-card { display: none; }
     .navbar { padding: 12px 16px; }
     .nav-right { gap: 4px; }
     .container { padding: 20px 16px 48px; }

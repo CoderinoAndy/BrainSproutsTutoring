@@ -200,11 +200,15 @@
                 <h3>Log Hours</h3>
                 <form id="logHoursForm">
                     <div class="form-row">
-                        <div class="form-group">
-                            <label for="hrTutor">Tutor</label>
-                            <select id="hrTutor" required class="select-input">
-                                <option value="">Select a tutor...</option>
-                            </select>
+                        <div class="form-group" style="min-width:240px;">
+                            <label>Tutors</label>
+                            <div class="multi-select" id="hrTutorSelect">
+                                <div class="multi-select-toggle" onclick="toggleMultiSelect()">
+                                    <span id="hrTutorLabel">Select tutors...</span>
+                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                </div>
+                                <div class="multi-select-dropdown" id="hrTutorDropdown"></div>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="hrDate">Date</label>
@@ -446,19 +450,33 @@
             const users = await res.json();
             const list = document.getElementById('usersList');
             let html = '<h3>Current Tutors</h3><div class="users-table">';
-            html += `<div class="table-header">
-                <span>Name</span><span>Username</span><span>Created</span><span></span>
+            html += `<div class="table-header table-5col">
+                <span>Name</span><span>Username</span><span>Executive Title</span><span>Created</span><span></span>
             </div>`;
             users.forEach(u => {
-                html += `<div class="table-row">
+                const titleOptions = ['Jr. Tutor', 'Tutor', 'Sr. Tutor', 'Lead Tutor', 'Executive Tutor'];
+                const titleSelect = !u.is_admin ? `<select class="select-input" style="padding:4px 8px;font-size:12px;" onchange="updateTitle(${u.id}, this.value)">
+                    ${titleOptions.map(t => `<option value="${t}" ${(u.executive_title || 'Jr. Tutor') === t ? 'selected' : ''}>${t}</option>`).join('')}
+                    </select>` : '';
+                html += `<div class="table-row table-5col">
                     <span class="user-name">${u.display_name} ${u.is_admin ? '<span class="nav-badge">Admin</span>' : ''}</span>
                     <span class="text-muted">${u.username}</span>
+                    <span>${titleSelect}</span>
                     <span class="text-muted">${u.created_at ? u.created_at.split('T')[0] : ''}</span>
                     <span>${!u.is_admin ? `<button class="btn btn-danger-ghost" onclick="deleteUser(${u.id}, '${u.display_name}')">Remove</button>` : ''}</span>
                 </div>`;
             });
             html += '</div>';
             list.innerHTML = html;
+        }
+
+        async function updateTitle(userId, title) {
+            const res = await fetch(`/api/admin/users/${userId}/title`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({ executive_title: title }),
+            });
+            if (!res.ok) alert('Failed to update title');
         }
 
         document.getElementById('createUserForm').addEventListener('submit', async (e) => {
@@ -546,24 +564,73 @@
 
         let allHours = [];
 
+        let hrSelectedTutors = new Set();
+
+        function toggleMultiSelect() {
+            const dd = document.getElementById('hrTutorDropdown');
+            dd.classList.toggle('open');
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            const sel = document.getElementById('hrTutorSelect');
+            if (sel && !sel.contains(e.target)) {
+                document.getElementById('hrTutorDropdown').classList.remove('open');
+            }
+        });
+
+        function toggleTutor(id, name) {
+            if (hrSelectedTutors.has(id)) hrSelectedTutors.delete(id);
+            else hrSelectedTutors.add(id);
+            updateTutorLabel();
+            // Update checkbox visual
+            const cb = document.getElementById('hr-cb-' + id);
+            if (cb) cb.checked = hrSelectedTutors.has(id);
+        }
+
+        function updateTutorLabel() {
+            const label = document.getElementById('hrTutorLabel');
+            if (hrSelectedTutors.size === 0) label.textContent = 'Select tutors...';
+            else label.textContent = hrSelectedTutors.size + ' tutor' + (hrSelectedTutors.size !== 1 ? 's' : '') + ' selected';
+        }
+
+        function selectAllTutors() {
+            const dd = document.getElementById('hrTutorDropdown');
+            const cbs = dd.querySelectorAll('input[type=checkbox]');
+            const allSelected = hrSelectedTutors.size === cbs.length;
+            if (allSelected) {
+                hrSelectedTutors.clear();
+                cbs.forEach(cb => cb.checked = false);
+            } else {
+                cbs.forEach(cb => { cb.checked = true; hrSelectedTutors.add(parseInt(cb.value)); });
+            }
+            updateTutorLabel();
+        }
+
         async function loadHoursTutorDropdowns() {
             const res = await fetch('/api/admin/users', {
                 headers: { 'Authorization': 'Bearer ' + token }
             });
             const users = await res.json();
             const tutors = users.filter(u => !u.is_admin);
-            const sel = document.getElementById('hrTutor');
+            const dd = document.getElementById('hrTutorDropdown');
             const filt = document.getElementById('hrFilter');
-            // Preserve current selections
-            const curSel = sel.value;
             const curFilt = filt.value;
-            sel.innerHTML = '<option value="">Select a tutor...</option>';
+
+            dd.innerHTML = `<label class="multi-select-item" onclick="selectAllTutors()">
+                <span style="font-weight:600;">Select All</span>
+            </label>`;
+            tutors.forEach(u => {
+                dd.innerHTML += `<label class="multi-select-item">
+                    <input type="checkbox" id="hr-cb-${u.id}" value="${u.id}" ${hrSelectedTutors.has(u.id) ? 'checked' : ''} onchange="toggleTutor(${u.id}, '${escapeHtml(u.display_name)}')">
+                    <span>${escapeHtml(u.display_name)}</span>
+                </label>`;
+            });
+
             filt.innerHTML = '<option value="">All Tutors</option>';
             tutors.forEach(u => {
-                sel.innerHTML += `<option value="${u.id}">${escapeHtml(u.display_name)}</option>`;
                 filt.innerHTML += `<option value="${u.id}">${escapeHtml(u.display_name)}</option>`;
             });
-            if (curSel) sel.value = curSel;
             if (curFilt) filt.value = curFilt;
         }
 
@@ -618,22 +685,29 @@
         document.getElementById('logHoursForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const msgEl = document.getElementById('hrMsg');
+            if (hrSelectedTutors.size === 0) {
+                showMsg(msgEl, false, 'Please select at least one tutor');
+                return;
+            }
             const res = await fetch('/api/admin/hours', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
                 body: JSON.stringify({
-                    user_id: parseInt(document.getElementById('hrTutor').value),
+                    user_ids: Array.from(hrSelectedTutors),
                     work_date: document.getElementById('hrDate').value,
                     hours: parseFloat(document.getElementById('hrHours').value),
                     description: document.getElementById('hrDesc').value,
                 }),
             });
             const data = await res.json();
-            showMsg(msgEl, res.ok, res.ok ? 'Hours logged!' : (data.error || 'Failed'));
+            showMsg(msgEl, res.ok, res.ok ? data.message : (data.error || 'Failed'));
             if (res.ok) {
                 document.getElementById('hrDate').value = '';
                 document.getElementById('hrHours').value = '';
                 document.getElementById('hrDesc').value = '';
+                hrSelectedTutors.clear();
+                updateTutorLabel();
+                document.querySelectorAll('#hrTutorDropdown input[type=checkbox]').forEach(cb => cb.checked = false);
                 loadHours();
             }
         });

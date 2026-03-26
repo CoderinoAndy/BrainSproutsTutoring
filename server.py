@@ -105,6 +105,7 @@ def init_db():
                 password_hash TEXT NOT NULL,
                 display_name TEXT NOT NULL,
                 is_admin BOOLEAN DEFAULT FALSE,
+                executive_title TEXT NOT NULL DEFAULT 'Jr. Tutor',
                 created_at TIMESTAMP DEFAULT NOW()
             )
         """)
@@ -154,6 +155,13 @@ def init_db():
                 "INSERT INTO users (username, password_hash, display_name, is_admin) VALUES (%s, %s, %s, TRUE)",
                 ("AndyAlbert", pw_hash, "Andy Albert"),
             )
+        # Migration: add executive_title column if missing
+        conn.commit()
+        try:
+            cur.execute("ALTER TABLE users ADD COLUMN executive_title TEXT NOT NULL DEFAULT 'Jr. Tutor'")
+            conn.commit()
+        except Exception:
+            conn.rollback()
         _seed_wednesday_events(cur)
     else:
         conn = sqlite3.connect(DB_PATH)
@@ -166,6 +174,7 @@ def init_db():
                 password_hash TEXT NOT NULL,
                 display_name TEXT NOT NULL,
                 is_admin INTEGER DEFAULT 0,
+                executive_title TEXT NOT NULL DEFAULT 'Jr. Tutor',
                 created_at TEXT DEFAULT (datetime('now'))
             )
         """)
@@ -217,6 +226,11 @@ def init_db():
                 "INSERT INTO users (username, password_hash, display_name, is_admin) VALUES (?, ?, ?, 1)",
                 ("AndyAlbert", pw_hash, "Andy Albert"),
             )
+        # Migration: add executive_title column if missing
+        try:
+            cur.execute("ALTER TABLE users ADD COLUMN executive_title TEXT NOT NULL DEFAULT 'Jr. Tutor'")
+        except Exception:
+            pass  # column already exists
         _seed_wednesday_events(cur)
     conn.commit()
     cur.close()
@@ -308,6 +322,7 @@ def login():
             "username": user["username"],
             "display_name": user["display_name"],
             "is_admin": bool(user["is_admin"]),
+            "executive_title": user.get("executive_title", "Jr. Tutor"),
         },
     })
 
@@ -317,7 +332,7 @@ def login():
 @admin_required
 def list_users():
     cur = get_cursor()
-    cur.execute("SELECT id, username, display_name, is_admin, created_at FROM users ORDER BY display_name")
+    cur.execute("SELECT id, username, display_name, is_admin, executive_title, created_at FROM users ORDER BY display_name")
     users = cur.fetchall()
     cur.close()
     return jsonify([serialize_row(u) for u in users])
@@ -361,6 +376,19 @@ def delete_user(user_id):
     get_db().commit()
     cur.close()
     return jsonify({"message": "User deleted"})
+
+@app.route("/api/admin/users/<int:user_id>/title", methods=["PUT"])
+@admin_required
+def update_user_title(user_id):
+    data = request.get_json()
+    title = data.get("executive_title", "").strip()
+    if not title:
+        return jsonify({"error": "Title is required"}), 400
+    cur = get_cursor()
+    cur.execute(_p("UPDATE users SET executive_title = %s WHERE id = %s"), (title, user_id))
+    get_db().commit()
+    cur.close()
+    return jsonify({"message": "Title updated"})
 
 # ── Routes: Admin Events ─────────────────────────────────────────────────────
 
@@ -600,6 +628,26 @@ def set_rsvp():
     cur.close()
     return jsonify({"message": "RSVP updated"})
 
+# ── Routes: Profile ──────────────────────────────────────────────────────────
+
+@app.route("/api/me", methods=["GET"])
+@token_required
+def get_me():
+    cur = get_cursor()
+    cur.execute(_p("SELECT id, username, display_name, executive_title FROM users WHERE id = %s"), (g.user_id,))
+    user = cur.fetchone()
+    cur.execute(_p("SELECT COALESCE(SUM(hours), 0) as total FROM hours WHERE user_id = %s"), (g.user_id,))
+    total = cur.fetchone()["total"]
+    cur.close()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    return jsonify({
+        "id": user["id"],
+        "display_name": user["display_name"],
+        "executive_title": user.get("executive_title", "Jr. Tutor"),
+        "total_hours": float(total),
+    })
+
 # ── Routes: Hours (tutor-facing) ──────────────────────────────────────────────
 
 @app.route("/api/hours", methods=["GET"])
@@ -636,13 +684,16 @@ def admin_get_hours():
 @admin_required
 def create_hours():
     data = request.get_json()
-    user_id = data.get("user_id")
+    user_ids = data.get("user_ids", [])
+    # Backwards compat: accept single user_id too
+    if not user_ids and data.get("user_id"):
+        user_ids = [data["user_id"]]
     work_date = data.get("work_date", "").strip()
     hours = data.get("hours")
     description = data.get("description", "").strip()
 
-    if not user_id or not work_date or hours is None:
-        return jsonify({"error": "Tutor, date, and hours are required"}), 400
+    if not user_ids or not work_date or hours is None:
+        return jsonify({"error": "At least one tutor, date, and hours are required"}), 400
     try:
         hours = float(hours)
         if hours <= 0:
@@ -655,13 +706,15 @@ def create_hours():
         return jsonify({"error": "Invalid date format"}), 400
 
     cur = get_cursor()
-    cur.execute(
-        _p("INSERT INTO hours (user_id, work_date, hours, description) VALUES (%s, %s, %s, %s)"),
-        (int(user_id), work_date, hours, description),
-    )
+    for uid in user_ids:
+        cur.execute(
+            _p("INSERT INTO hours (user_id, work_date, hours, description) VALUES (%s, %s, %s, %s)"),
+            (int(uid), work_date, hours, description),
+        )
     get_db().commit()
     cur.close()
-    return jsonify({"message": "Hours logged successfully"}), 201
+    count = len(user_ids)
+    return jsonify({"message": f"Hours logged for {count} tutor{'s' if count != 1 else ''}"}), 201
 
 @app.route("/api/admin/hours/<int:hour_id>", methods=["PUT"])
 @admin_required

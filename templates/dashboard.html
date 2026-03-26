@@ -14,10 +14,18 @@
             <span class="nav-brand">BrainSprouts</span>
         </div>
         <div class="nav-right">
+            <span class="nav-hours-badge" id="navHours" title="Total hours logged">0.0h</span>
             <span class="nav-user" id="navUser"></span>
             <button class="btn btn-ghost" onclick="logout()">Sign Out</button>
         </div>
     </nav>
+
+    <!-- Title Card (right side) -->
+    <div class="title-card" id="titleCard">
+        <div class="title-card-label">Executive Level</div>
+        <div class="title-card-value" id="titleCardValue">Jr. Tutor</div>
+        <div class="title-card-name" id="titleCardName"></div>
+    </div>
 
     <main class="container">
         <div id="announcementsBanner"></div>
@@ -226,6 +234,18 @@
             container.innerHTML = html;
         }
 
+        async function loadProfile() {
+            const res = await fetch('/api/me', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if (!res.ok) return;
+            const me = await res.json();
+            document.getElementById('navHours').textContent = me.total_hours.toFixed(1) + 'h';
+            document.getElementById('titleCardValue').textContent = me.executive_title || 'Jr. Tutor';
+            document.getElementById('titleCardName').textContent = me.display_name;
+        }
+
+        loadProfile();
         loadEvents();
         loadAnnouncements();
         loadMyHours();
