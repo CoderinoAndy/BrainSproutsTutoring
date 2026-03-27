@@ -507,6 +507,25 @@ def create_repeating_events():
     cur.close()
     return jsonify({"message": f"{created} events created, {skipped} skipped (duplicates or excluded)"}), 201
 
+@app.route("/api/admin/events/<int:event_id>", methods=["PUT"])
+@admin_required
+def update_event(event_id):
+    data = request.get_json()
+    title = data.get("title", "").strip()
+    start_time = data.get("start_time", "").strip()
+    end_time = data.get("end_time", "").strip()
+    max_capacity = data.get("max_capacity")
+    if not title or not start_time or not end_time or max_capacity is None:
+        return jsonify({"error": "All fields required"}), 400
+    cur = get_cursor()
+    cur.execute(
+        _p("UPDATE events SET title = %s, start_time = %s, end_time = %s, max_capacity = %s WHERE id = %s"),
+        (title, start_time, end_time, int(max_capacity), event_id),
+    )
+    get_db().commit()
+    cur.close()
+    return jsonify({"message": "Event updated"})
+
 @app.route("/api/admin/events/<int:event_id>", methods=["DELETE"])
 @admin_required
 def delete_event(event_id):
@@ -520,6 +539,24 @@ def delete_event(event_id):
     get_db().commit()
     cur.close()
     return jsonify({"message": "Event deleted"})
+
+@app.route("/api/admin/events/by-title", methods=["DELETE"])
+@admin_required
+def delete_events_by_title():
+    data = request.get_json()
+    title = data.get("title", "").strip()
+    if not title:
+        return jsonify({"error": "Title is required"}), 400
+    cur = get_cursor()
+    # Get all dates for this title to clean up RSVPs
+    cur.execute(_p("SELECT event_date FROM events WHERE title = %s"), (title,))
+    dates = [r["event_date"] for r in cur.fetchall()]
+    for d in dates:
+        cur.execute(_p("DELETE FROM rsvps WHERE event_date = %s"), (d,))
+    cur.execute(_p("DELETE FROM events WHERE title = %s"), (title,))
+    get_db().commit()
+    cur.close()
+    return jsonify({"message": f"Deleted {len(dates)} events with title '{title}'"})
 
 # ── Routes: Announcements ─────────────────────────────────────────────────────
 

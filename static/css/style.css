@@ -614,6 +614,11 @@ body {
     grid-template-columns: 1.4fr 1fr 1fr 0.6fr 80px;
 }
 
+/* ── Events table (5 col with wider actions) ──────────────────────────────── */
+.table-events {
+    grid-template-columns: 1.2fr 1fr 1fr 0.5fr 140px;
+}
+
 /* ── Navbar Hours Badge ────────────────────────────────────────────────────── */
 .nav-hours-badge {
     display: inline-flex;
@@ -806,6 +811,9 @@ body {
     .table-5col span:nth-child(4) { display: none; }
     .table-hours { grid-template-columns: 1fr 0.6fr 0.4fr 80px; }
     .table-hours span:nth-child(4) { display: none; }
+    .table-events { grid-template-columns: 1fr 1fr 100px; }
+    .table-events span:nth-child(3),
+    .table-events span:nth-child(4) { display: none; }
     .title-card { display: none; }
     .navbar { padding: 12px 16px; }
     .nav-right { gap: 4px; }

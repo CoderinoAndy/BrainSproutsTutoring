@@ -362,27 +362,55 @@
 
         // ── Manage Events ──
 
+        let allEvents = [];
+
         async function loadEventList() {
             const res = await fetch('/api/admin/events', {
                 headers: { 'Authorization': 'Bearer ' + token }
             });
-            const events = await res.json();
+            allEvents = await res.json();
+            renderEventList();
+        }
+
+        function renderEventList() {
             const container = document.getElementById('eventList');
-            if (events.length === 0) {
+            if (allEvents.length === 0) {
                 container.innerHTML = '<p class="text-muted" style="margin-top:16px;">No events yet.</p>';
                 return;
             }
-            let html = '<h3 style="margin-top:24px;">All Events</h3><div class="users-table" style="margin-top:8px;">';
-            html += `<div class="table-header table-5col">
+
+            // Group by title for "Delete Series" buttons
+            const titles = [...new Set(allEvents.map(ev => ev.title))];
+            const seriesCounts = {};
+            titles.forEach(t => { seriesCounts[t] = allEvents.filter(ev => ev.title === t).length; });
+
+            let html = '';
+
+            // Show "Delete Series" buttons for titles with multiple events
+            const seriesTitles = titles.filter(t => seriesCounts[t] > 1);
+            if (seriesTitles.length > 0) {
+                html += '<div style="margin-top:24px;margin-bottom:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">';
+                html += '<span style="font-size:13px;font-weight:600;color:var(--gray-700);">Delete entire series:</span>';
+                seriesTitles.forEach(t => {
+                    html += `<button class="btn btn-danger-ghost" onclick="deleteEventSeries('${escapeHtml(t)}')">${escapeHtml(t)} (${seriesCounts[t]})</button>`;
+                });
+                html += '</div>';
+            }
+
+            html += '<h3 style="margin-top:16px;">All Events</h3><div class="users-table" style="margin-top:8px;">';
+            html += `<div class="table-header table-events">
                 <span>Date</span><span>Title</span><span>Time</span><span>Capacity</span><span></span>
             </div>`;
-            events.forEach(ev => {
-                html += `<div class="table-row table-5col">
+            allEvents.forEach(ev => {
+                html += `<div class="table-row table-events" id="ev-row-${ev.id}">
                     <span class="user-name">${formatDate(ev.date)}</span>
                     <span>${escapeHtml(ev.title)}</span>
                     <span class="text-muted">${fmtTime(ev.start_time)} - ${fmtTime(ev.end_time)}</span>
                     <span class="text-muted">${ev.yes_count}/${ev.max_capacity}</span>
-                    <span><button class="btn btn-danger-ghost" onclick="deleteEvent(${ev.id}, '${ev.date}')">Delete</button></span>
+                    <span style="display:flex;gap:4px;">
+                        <button class="btn btn-danger-ghost" style="border-color:var(--gray-300);color:var(--gray-600);" onclick="editEvent(${ev.id})">Edit</button>
+                        <button class="btn btn-danger-ghost" onclick="deleteEvent(${ev.id}, '${ev.date}')">Delete</button>
+                    </span>
                 </div>`;
             });
             html += '</div>';
@@ -432,6 +460,40 @@
             if (res.ok) { document.getElementById('repeatEventForm').reset(); loadEventList(); }
         });
 
+        function editEvent(id) {
+            const ev = allEvents.find(e => e.id === id);
+            if (!ev) return;
+            const row = document.getElementById('ev-row-' + id);
+            row.innerHTML = `
+                <span class="user-name">${formatDate(ev.date)}</span>
+                <span><input type="text" id="editEvTitle-${id}" value="${escapeHtml(ev.title)}" style="width:100%;padding:4px 8px;border:1px solid var(--gray-300);border-radius:4px;font-family:inherit;font-size:13px;"></span>
+                <span style="display:flex;gap:4px;">
+                    <input type="time" id="editEvStart-${id}" value="${ev.start_time}" style="padding:4px 6px;border:1px solid var(--gray-300);border-radius:4px;font-family:inherit;font-size:13px;">
+                    <input type="time" id="editEvEnd-${id}" value="${ev.end_time}" style="padding:4px 6px;border:1px solid var(--gray-300);border-radius:4px;font-family:inherit;font-size:13px;">
+                </span>
+                <span><input type="number" id="editEvCap-${id}" value="${ev.max_capacity}" min="1" style="width:60px;padding:4px 8px;border:1px solid var(--gray-300);border-radius:4px;font-family:inherit;font-size:13px;"></span>
+                <span style="display:flex;gap:4px;">
+                    <button class="btn btn-danger-ghost" style="border-color:var(--green-600);color:var(--green-700);" onclick="saveEvent(${id})">Save</button>
+                    <button class="btn btn-danger-ghost" style="border-color:var(--gray-300);color:var(--gray-600);" onclick="renderEventList()">Cancel</button>
+                </span>
+            `;
+        }
+
+        async function saveEvent(id) {
+            const res = await fetch(`/api/admin/events/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({
+                    title: document.getElementById('editEvTitle-' + id).value,
+                    start_time: document.getElementById('editEvStart-' + id).value,
+                    end_time: document.getElementById('editEvEnd-' + id).value,
+                    max_capacity: parseInt(document.getElementById('editEvCap-' + id).value),
+                }),
+            });
+            if (res.ok) loadEventList();
+            else alert('Failed to update event');
+        }
+
         async function deleteEvent(id, date) {
             if (!confirm(`Delete the event on ${date}? This will also remove all RSVPs for it.`)) return;
             await fetch(`/api/admin/events/${id}`, {
@@ -439,6 +501,18 @@
                 headers: { 'Authorization': 'Bearer ' + token },
             });
             loadEventList();
+        }
+
+        async function deleteEventSeries(title) {
+            const count = allEvents.filter(ev => ev.title === title).length;
+            if (!confirm(`Delete ALL ${count} "${title}" events? This will also remove all their RSVPs.`)) return;
+            const res = await fetch('/api/admin/events/by-title', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({ title }),
+            });
+            if (res.ok) loadEventList();
+            else alert('Failed to delete series');
         }
 
         // ── Users ──
@@ -454,7 +528,7 @@
                 <span>Name</span><span>Username</span><span>Executive Title</span><span>Created</span><span></span>
             </div>`;
             users.forEach(u => {
-                const titleOptions = ['Jr. Tutor', 'Tutor', 'Sr. Tutor', 'Lead Tutor', 'Executive Tutor'];
+                const titleOptions = ['Jr. Tutor', 'Reserve Tutor', 'Tutor', 'Sr. Tutor', 'Lead Tutor', 'Executive Tutor', 'Marketing Director', 'Hartman Lead', 'CICS Lead'];
                 const titleSelect = !u.is_admin ? `<select class="select-input" style="padding:4px 8px;font-size:12px;" onchange="updateTitle(${u.id}, this.value)">
                     ${titleOptions.map(t => `<option value="${t}" ${(u.executive_title || 'Jr. Tutor') === t ? 'selected' : ''}>${t}</option>`).join('')}
                     </select>` : '';
