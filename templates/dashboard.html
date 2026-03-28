@@ -27,6 +27,62 @@
         <div class="title-card-name" id="titleCardName"></div>
     </div>
 
+    <!-- Mascot (left side) -->
+    <div class="mascot-container">
+        <div class="mascot-bubble">Please sign up for an event! $5 Monopoly money if you do</div>
+        <svg class="mascot-panda" viewBox="0 0 200 220" width="140" xmlns="http://www.w3.org/2000/svg">
+            <!-- Body -->
+            <ellipse cx="100" cy="160" rx="55" ry="50" fill="#c0542b"/>
+            <!-- Belly -->
+            <ellipse cx="100" cy="168" rx="35" ry="32" fill="#e8a87c"/>
+            <!-- Head -->
+            <circle cx="100" cy="90" r="45" fill="#c0542b"/>
+            <!-- Face mask -->
+            <ellipse cx="100" cy="98" rx="32" ry="26" fill="#e8a87c"/>
+            <!-- Ears -->
+            <circle cx="65" cy="58" r="16" fill="#c0542b"/>
+            <circle cx="135" cy="58" r="16" fill="#c0542b"/>
+            <circle cx="65" cy="58" r="10" fill="#8b3a1a"/>
+            <circle cx="135" cy="58" r="10" fill="#8b3a1a"/>
+            <!-- Eye patches (dark) -->
+            <ellipse cx="82" cy="86" rx="14" ry="12" fill="#8b3a1a"/>
+            <ellipse cx="118" cy="86" rx="14" ry="12" fill="#8b3a1a"/>
+            <!-- Eyes (white + pupil) -->
+            <circle cx="82" cy="86" r="7" fill="white"/>
+            <circle cx="118" cy="86" r="7" fill="white"/>
+            <circle cx="84" cy="85" r="4" fill="#1a1a1a"/>
+            <circle cx="120" cy="85" r="4" fill="#1a1a1a"/>
+            <circle cx="85" cy="84" r="1.5" fill="white"/>
+            <circle cx="121" cy="84" r="1.5" fill="white"/>
+            <!-- Nose -->
+            <ellipse cx="100" cy="100" rx="5" ry="3.5" fill="#1a1a1a"/>
+            <!-- Mouth -->
+            <path d="M95 105 Q100 111 105 105" stroke="#1a1a1a" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+            <!-- Cheek marks -->
+            <line x1="60" y1="93" x2="72" y2="95" stroke="#e8a87c" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="60" y1="97" x2="72" y2="98" stroke="#e8a87c" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="128" y1="95" x2="140" y2="93" stroke="#e8a87c" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="128" y1="98" x2="140" y2="97" stroke="#e8a87c" stroke-width="2.5" stroke-linecap="round"/>
+            <!-- Tail -->
+            <path d="M45 155 Q20 130 35 110 Q50 95 55 115 Q58 130 50 145" fill="#c0542b" stroke="#8b3a1a" stroke-width="1"/>
+            <path d="M40 120 Q48 115 45 130" fill="#e8a87c" stroke="none"/>
+            <!-- Tail stripes -->
+            <path d="M33 115 Q42 110 48 118" stroke="#8b3a1a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+            <path d="M38 125 Q46 120 50 130" stroke="#8b3a1a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+            <!-- Feet -->
+            <ellipse cx="75" cy="205" rx="18" ry="10" fill="#8b3a1a"/>
+            <ellipse cx="125" cy="205" rx="18" ry="10" fill="#8b3a1a"/>
+            <!-- Arms -->
+            <ellipse cx="55" cy="155" rx="12" ry="22" fill="#c0542b" transform="rotate(15 55 155)"/>
+            <ellipse cx="145" cy="155" rx="12" ry="22" fill="#c0542b" transform="rotate(-15 145 155)"/>
+            <!-- Sprout! -->
+            <line x1="100" y1="48" x2="100" y2="22" stroke="#16a34a" stroke-width="3" stroke-linecap="round"/>
+            <ellipse cx="92" cy="20" rx="8" ry="12" fill="#22c55e" transform="rotate(-30 92 20)"/>
+            <ellipse cx="108" cy="20" rx="8" ry="12" fill="#22c55e" transform="rotate(30 108 20)"/>
+            <ellipse cx="100" cy="15" rx="6" ry="10" fill="#4ade80"/>
+        </svg>
+    </div>
+
     <main class="container">
         <div id="announcementsBanner"></div>
 
@@ -114,8 +170,9 @@
                     <div class="events-list">`;
                 evts.forEach(ev => {
                     const isPast = new Date(ev.date + 'T23:59:59') < new Date();
+                    const statusBorder = ev.my_status === 'yes' ? 'event-card-yes' : ev.my_status === 'maybe' ? 'event-card-maybe' : ev.my_status === 'no' ? 'event-card-no' : '';
                     html += `
-                    <div class="event-card ${isPast ? 'event-past' : ''}">
+                    <div class="event-card ${isPast ? 'event-past' : ''} ${statusBorder}">
                         <div class="event-info">
                             <div class="event-date">${formatDate(ev.date)}</div>
                             <div class="event-time">${fmtTime(ev.start_time)} - ${fmtTime(ev.end_time)} &middot; ${escapeHtml(ev.title)}</div>

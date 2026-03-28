@@ -20,6 +20,7 @@
             <button class="btn btn-ghost tab-btn" data-tab="announcements" onclick="switchTab('announcements')">Announcements</button>
             <button class="btn btn-ghost tab-btn" data-tab="users" onclick="switchTab('users')">Manage Tutors</button>
             <button class="btn btn-ghost tab-btn" data-tab="hours" onclick="switchTab('hours')">Hours</button>
+            <button class="btn btn-ghost tab-btn" data-tab="roles" onclick="switchTab('roles')">Roles</button>
             <button class="btn btn-ghost" onclick="logout()">Sign Out</button>
         </div>
     </nav>
@@ -238,6 +239,28 @@
 
             <div id="hoursList"></div>
         </div>
+
+        <!-- Roles Tab -->
+        <div id="tab-roles" class="tab-content" style="display:none;">
+            <div class="page-header">
+                <h2>Manage Roles</h2>
+                <p class="text-muted">Create roles and arrange them by hierarchy. Higher = more senior.</p>
+            </div>
+
+            <div class="create-user-card">
+                <h3>Create New Role</h3>
+                <form id="createRoleForm" class="form-row">
+                    <div class="form-group">
+                        <label for="newRoleName">Role Name</label>
+                        <input type="text" id="newRoleName" required placeholder="e.g. Program Coordinator">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-create">Add Role</button>
+                </form>
+                <div id="roleMsg" class="msg" style="display:none;"></div>
+            </div>
+
+            <div id="rolesList"></div>
+        </div>
     </main>
 
     <script>
@@ -286,6 +309,7 @@
             if (tab === 'users') loadUsers();
             if (tab === 'announcements') loadAnnouncements();
             if (tab === 'hours') { loadHoursTutorDropdowns(); loadHours(); }
+            if (tab === 'roles') loadRoles();
         }
 
         // ── Schedule ──
@@ -517,20 +541,30 @@
 
         // ── Users ──
 
-        async function loadUsers() {
-            const res = await fetch('/api/admin/users', {
+        let cachedRoles = [];
+
+        async function fetchRoles() {
+            const res = await fetch('/api/roles', {
                 headers: { 'Authorization': 'Bearer ' + token }
             });
-            const users = await res.json();
+            cachedRoles = await res.json();
+            return cachedRoles;
+        }
+
+        async function loadUsers() {
+            const [usersRes] = await Promise.all([
+                fetch('/api/admin/users', { headers: { 'Authorization': 'Bearer ' + token } }),
+                cachedRoles.length ? Promise.resolve() : fetchRoles(),
+            ]);
+            const users = await usersRes.json();
             const list = document.getElementById('usersList');
             let html = '<h3>Current Tutors</h3><div class="users-table">';
             html += `<div class="table-header table-5col">
                 <span>Name</span><span>Username</span><span>Executive Title</span><span>Created</span><span></span>
             </div>`;
             users.forEach(u => {
-                const titleOptions = ['Jr. Tutor', 'Reserve Tutor', 'Tutor', 'Sr. Tutor', 'Lead Tutor', 'Executive Tutor', 'Marketing Director', 'Hartman Lead', 'CICS Lead'];
                 const titleSelect = !u.is_admin ? `<select class="select-input" style="padding:4px 8px;font-size:12px;" onchange="updateTitle(${u.id}, this.value)">
-                    ${titleOptions.map(t => `<option value="${t}" ${(u.executive_title || 'Jr. Tutor') === t ? 'selected' : ''}>${t}</option>`).join('')}
+                    ${cachedRoles.map(r => `<option value="${escapeHtml(r.name)}" ${(u.executive_title || 'Jr. Tutor') === r.name ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
                     </select>` : '';
                 html += `<div class="table-row table-5col">
                     <span class="user-name">${u.display_name} ${u.is_admin ? '<span class="nav-badge">Admin</span>' : ''}</span>
@@ -824,6 +858,79 @@
             });
             loadHours();
         }
+
+        // ── Roles ──
+
+        async function loadRoles() {
+            await fetchRoles();
+            renderRoles();
+        }
+
+        function renderRoles() {
+            const container = document.getElementById('rolesList');
+            if (cachedRoles.length === 0) {
+                container.innerHTML = '<p class="text-muted">No roles defined yet.</p>';
+                return;
+            }
+            let html = '<h3>Role Hierarchy</h3><p class="text-muted" style="margin-bottom:12px;">Top = lowest rank. Use arrows to reorder.</p>';
+            html += '<div class="roles-list">';
+            cachedRoles.forEach((r, i) => {
+                html += `<div class="role-item">
+                    <div class="role-item-left">
+                        <span class="role-rank">${i + 1}</span>
+                        <span class="role-name">${escapeHtml(r.name)}</span>
+                    </div>
+                    <div class="role-item-right">
+                        <button class="btn-role-arrow" ${i === 0 ? 'disabled' : ''} onclick="moveRole(${i}, -1)" title="Move up">&#9650;</button>
+                        <button class="btn-role-arrow" ${i === cachedRoles.length - 1 ? 'disabled' : ''} onclick="moveRole(${i}, 1)" title="Move down">&#9660;</button>
+                        <button class="btn btn-danger-ghost" onclick="deleteRole(${r.id}, '${escapeHtml(r.name)}')">Delete</button>
+                    </div>
+                </div>`;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        async function moveRole(index, direction) {
+            const newIndex = index + direction;
+            if (newIndex < 0 || newIndex >= cachedRoles.length) return;
+            // Swap in local array
+            [cachedRoles[index], cachedRoles[newIndex]] = [cachedRoles[newIndex], cachedRoles[index]];
+            renderRoles();
+            // Persist new order
+            const res = await fetch('/api/admin/roles/reorder', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({ role_ids: cachedRoles.map(r => r.id) }),
+            });
+            if (!res.ok) alert('Failed to save order');
+        }
+
+        async function deleteRole(id, name) {
+            if (!confirm(`Delete the "${name}" role? Users with this role will be reset to "Jr. Tutor".`)) return;
+            await fetch(`/api/admin/roles/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': 'Bearer ' + token },
+            });
+            await loadRoles();
+        }
+
+        document.getElementById('createRoleForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const msgEl = document.getElementById('roleMsg');
+            const name = document.getElementById('newRoleName').value.trim();
+            const res = await fetch('/api/admin/roles', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({ name }),
+            });
+            const data = await res.json();
+            showMsg(msgEl, res.ok, res.ok ? 'Role created!' : (data.error || 'Failed'));
+            if (res.ok) {
+                document.getElementById('newRoleName').value = '';
+                await loadRoles();
+            }
+        });
 
         function logout() {
             localStorage.removeItem('bs_token');

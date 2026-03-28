@@ -787,6 +787,155 @@ body {
     white-space: nowrap;
 }
 
+/* ── Roles List ────────────────────────────────────────────────────────────── */
+.roles-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.role-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    padding: 12px 20px;
+    transition: box-shadow 0.15s;
+}
+
+.role-item:hover { box-shadow: var(--shadow-md); }
+
+.role-item-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.role-rank {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    background: var(--green-100);
+    color: var(--green-700);
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 100px;
+}
+
+.role-name {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.role-item-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-role-arrow {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-sm);
+    background: white;
+    font-size: 12px;
+    color: var(--gray-600);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.btn-role-arrow:hover:not(:disabled) {
+    border-color: var(--green-400);
+    color: var(--green-700);
+    background: var(--green-50);
+}
+
+.btn-role-arrow:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+/* ── Colored Event Cards (tutor RSVP status) ─────────────────────────────── */
+.event-card-yes {
+    border-left: 4px solid var(--green-500);
+    background: linear-gradient(90deg, var(--green-50) 0%, transparent 30%);
+}
+
+.event-card-maybe {
+    border-left: 4px solid var(--amber);
+    background: linear-gradient(90deg, #fffbeb 0%, transparent 30%);
+}
+
+.event-card-no {
+    border-left: 4px solid var(--red);
+    background: linear-gradient(90deg, #fef2f2 0%, transparent 30%);
+}
+
+/* ── Mascot ───────────────────────────────────────────────────────────────── */
+.mascot-container {
+    position: fixed;
+    bottom: 24px;
+    left: 24px;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.mascot-bubble {
+    background: white;
+    border: 2px solid var(--green-300);
+    border-radius: 16px;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--gray-700);
+    max-width: 180px;
+    text-align: center;
+    margin-bottom: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    position: relative;
+}
+
+.mascot-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 8px solid white;
+}
+
+.mascot-bubble::before {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 9px solid transparent;
+    border-right: 9px solid transparent;
+    border-top: 9px solid var(--green-300);
+}
+
+.mascot-panda {
+    display: block;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.12));
+}
+
 /* ── Responsive ────────────────────────────────────────────────────────────── */
 @media (max-width: 700px) {
     .event-card {
@@ -815,6 +964,7 @@ body {
     .table-events span:nth-child(3),
     .table-events span:nth-child(4) { display: none; }
     .title-card { display: none; }
+    .mascot-container { display: none; }
     .navbar { padding: 12px 16px; }
     .nav-right { gap: 4px; }
     .container { padding: 20px 16px 48px; }

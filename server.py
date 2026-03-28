@@ -92,6 +92,26 @@ def _seed_wednesday_events(cur):
             )
         current += timedelta(days=7)
 
+DEFAULT_ROLES = [
+    ("Jr. Tutor", 0),
+    ("Reserve Tutor", 1),
+    ("Tutor", 2),
+    ("Sr. Tutor", 3),
+    ("Lead Tutor", 4),
+    ("Executive Tutor", 5),
+    ("Marketing Director", 6),
+    ("Hartman Lead", 7),
+    ("CICS Lead", 8),
+]
+
+def _seed_roles(cur):
+    """Insert default roles if roles table is empty."""
+    cur.execute("SELECT COUNT(*) as c FROM roles")
+    if cur.fetchone()["c"] > 0:
+        return
+    for name, rank in DEFAULT_ROLES:
+        cur.execute(_p("INSERT INTO roles (name, rank) VALUES (%s, %s)"), (name, rank))
+
 # ── DB init ───────────────────────────────────────────────────────────────────
 
 def init_db():
@@ -148,6 +168,13 @@ def init_db():
                 created_at TIMESTAMP DEFAULT NOW()
             )
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS roles (
+                id SERIAL PRIMARY KEY,
+                name TEXT UNIQUE NOT NULL,
+                rank INTEGER NOT NULL DEFAULT 0
+            )
+        """)
         cur.execute("SELECT id FROM users WHERE username = %s", ("AndyAlbert",))
         if not cur.fetchone():
             pw_hash = bcrypt.hashpw("BrainSprouts2000".encode(), bcrypt.gensalt()).decode()
@@ -163,6 +190,7 @@ def init_db():
         except Exception:
             conn.rollback()
         _seed_wednesday_events(cur)
+        _seed_roles(cur)
     else:
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = _sqlite_dict_factory
@@ -219,6 +247,13 @@ def init_db():
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS roles (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                rank INTEGER NOT NULL DEFAULT 0
+            )
+        """)
         cur.execute("SELECT id FROM users WHERE username = ?", ("AndyAlbert",))
         if not cur.fetchone():
             pw_hash = bcrypt.hashpw("BrainSprouts2000".encode(), bcrypt.gensalt()).decode()
@@ -232,6 +267,7 @@ def init_db():
         except Exception:
             pass  # column already exists
         _seed_wednesday_events(cur)
+        _seed_roles(cur)
     conn.commit()
     cur.close()
     conn.close()
@@ -389,6 +425,68 @@ def update_user_title(user_id):
     get_db().commit()
     cur.close()
     return jsonify({"message": "Title updated"})
+
+# ── Routes: Roles ────────────────────────────────────────────────────────────
+
+@app.route("/api/roles", methods=["GET"])
+@token_required
+def get_roles():
+    cur = get_cursor()
+    cur.execute("SELECT id, name, rank FROM roles ORDER BY rank")
+    rows = cur.fetchall()
+    cur.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/admin/roles", methods=["POST"])
+@admin_required
+def create_role():
+    data = request.get_json()
+    name = data.get("name", "").strip()
+    if not name:
+        return jsonify({"error": "Role name is required"}), 400
+    cur = get_cursor()
+    # Put new role at the end
+    cur.execute("SELECT COALESCE(MAX(rank), -1) + 1 as next_rank FROM roles")
+    next_rank = cur.fetchone()["next_rank"]
+    try:
+        cur.execute(_p("INSERT INTO roles (name, rank) VALUES (%s, %s)"), (name, next_rank))
+        get_db().commit()
+    except Exception:
+        get_db().rollback()
+        cur.close()
+        return jsonify({"error": "Role already exists"}), 409
+    cur.close()
+    return jsonify({"message": "Role created"}), 201
+
+@app.route("/api/admin/roles/<int:role_id>", methods=["DELETE"])
+@admin_required
+def delete_role(role_id):
+    cur = get_cursor()
+    cur.execute(_p("SELECT name FROM roles WHERE id = %s"), (role_id,))
+    role = cur.fetchone()
+    if not role:
+        cur.close()
+        return jsonify({"error": "Role not found"}), 404
+    # Reset users with this role to the default
+    cur.execute(_p("UPDATE users SET executive_title = 'Jr. Tutor' WHERE executive_title = %s"), (role["name"],))
+    cur.execute(_p("DELETE FROM roles WHERE id = %s"), (role_id,))
+    get_db().commit()
+    cur.close()
+    return jsonify({"message": "Role deleted"})
+
+@app.route("/api/admin/roles/reorder", methods=["PUT"])
+@admin_required
+def reorder_roles():
+    data = request.get_json()
+    role_ids = data.get("role_ids", [])
+    if not role_ids:
+        return jsonify({"error": "role_ids array required"}), 400
+    cur = get_cursor()
+    for rank, role_id in enumerate(role_ids):
+        cur.execute(_p("UPDATE roles SET rank = %s WHERE id = %s"), (rank, int(role_id)))
+    get_db().commit()
+    cur.close()
+    return jsonify({"message": "Roles reordered"})
 
 # ── Routes: Admin Events ─────────────────────────────────────────────────────
 
