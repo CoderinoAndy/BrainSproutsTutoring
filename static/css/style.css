@@ -933,6 +933,8 @@ body {
 
 .mascot-panda {
     display: block;
+    width: 150px;
+    height: auto;
     filter: drop-shadow(0 2px 6px rgba(0,0,0,0.12));
 }
 
