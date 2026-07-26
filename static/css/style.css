@@ -1,4 +1,3 @@
-/* ── Reset & Base ──────────────────────────────────────────────────────────── */
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
@@ -10,7 +9,6 @@
     --green-600: #16a34a;
     --green-700: #15803d;
     --green-800: #166534;
-    --green-900: #14532d;
 
     --gray-50: #fafafa;
     --gray-100: #f4f4f5;
@@ -20,7 +18,6 @@
     --gray-500: #71717a;
     --gray-600: #52525b;
     --gray-700: #3f3f46;
-    --gray-800: #27272a;
     --gray-900: #18181b;
 
     --amber-100: #fef3c7;
@@ -33,8 +30,6 @@
 
     --radius: 10px;
     --radius-sm: 6px;
-    --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
-    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
     --shadow-md: 0 4px 6px rgba(0,0,0,0.05), 0 2px 4px rgba(0,0,0,0.04);
 }
 
@@ -46,7 +41,10 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
-/* ── Login ─────────────────────────────────────────────────────────────────── */
+.is-hidden {
+    display: none !important;
+}
+
 .login-body {
     background: linear-gradient(135deg, var(--green-50) 0%, white 50%, var(--green-50) 100%);
     min-height: 100vh;
@@ -63,15 +61,9 @@ body {
 
 .login-card {
     background: white;
-    border: 1px solid var(--gray-200);
     border-radius: 16px;
     padding: 40px 32px 32px;
-    box-shadow: var(--shadow-md);
     text-align: center;
-}
-
-.login-logo {
-    margin-bottom: 16px;
 }
 
 .login-card h1 {
@@ -132,14 +124,6 @@ body {
     text-align: left;
 }
 
-.footer-text {
-    text-align: center;
-    color: var(--gray-400);
-    font-size: 12px;
-    margin-top: 24px;
-}
-
-/* ── Buttons ───────────────────────────────────────────────────────────────── */
 .btn {
     display: inline-flex;
     align-items: center;
@@ -188,7 +172,25 @@ body {
 
 .btn-danger-ghost:hover { background: var(--red-100); }
 
-/* ── Navbar ────────────────────────────────────────────────────────────────── */
+.btn-auto-width {
+    width: auto;
+}
+
+.btn-log-hours {
+    width: auto;
+    margin-top: 8px;
+}
+
+.btn-secondary-ghost {
+    border-color: var(--gray-300);
+    color: var(--gray-600);
+}
+
+.btn-save-ghost {
+    border-color: var(--green-600);
+    color: var(--green-700);
+}
+
 .navbar {
     display: flex;
     align-items: center;
@@ -234,7 +236,6 @@ body {
     background: var(--green-50);
 }
 
-/* ── Container ─────────────────────────────────────────────────────────────── */
 .container {
     max-width: 860px;
     margin: 0 auto;
@@ -256,7 +257,6 @@ body {
     font-size: 14px;
 }
 
-/* ── Calendar ──────────────────────────────────────────────────────────────── */
 .month-section {
     margin-bottom: 32px;
 }
@@ -359,7 +359,6 @@ body {
 .btn-rsvp.btn-no.active { background: var(--red-500); color: white; border-color: var(--red-500); }
 .btn-rsvp:disabled { opacity: 0.4; cursor: not-allowed; }
 
-/* ── Admin Events ──────────────────────────────────────────────────────────── */
 .admin-event-card {
     background: white;
     border: 1px solid var(--gray-200);
@@ -431,7 +430,6 @@ body {
     margin: 2px 4px 2px 0;
 }
 
-/* ── Create User Form ──────────────────────────────────────────────────────── */
 .create-user-card {
     background: white;
     border: 1px solid var(--gray-200);
@@ -459,6 +457,15 @@ body {
     margin-bottom: 0;
 }
 
+.form-row-spaced,
+.form-group-spaced {
+    margin-top: 12px;
+}
+
+.form-row .form-group-tutor-select {
+    min-width: 240px;
+}
+
 .btn-create {
     width: auto;
     white-space: nowrap;
@@ -476,7 +483,6 @@ body {
 .msg-success { background: var(--green-100); color: var(--green-700); }
 .msg-error { background: var(--red-100); color: var(--red-700); }
 
-/* ── Users Table ───────────────────────────────────────────────────────────── */
 .users-list h3 {
     font-size: 15px;
     font-weight: 600;
@@ -521,7 +527,48 @@ body {
     gap: 8px;
 }
 
-/* ── Announcements ─────────────────────────────────────────────────────────── */
+.content-empty-spaced,
+.section-heading-spaced {
+    margin-top: 16px;
+}
+
+.table-spaced-sm {
+    margin-top: 8px;
+}
+
+.table-spaced {
+    margin-top: 12px;
+}
+
+.inline-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.inline-edit-input {
+    padding: 4px 8px;
+    border: 1px solid var(--gray-300);
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 13px;
+}
+
+.inline-edit-input-full {
+    width: 100%;
+}
+
+.inline-edit-input-time {
+    padding: 4px 6px;
+}
+
+.inline-edit-input-capacity {
+    width: 60px;
+}
+
+.inline-edit-input-hours {
+    width: 70px;
+}
+
 .announcements-section {
     margin-bottom: 28px;
 }
@@ -544,12 +591,26 @@ body {
     margin-bottom: 8px;
 }
 
+.announcement-heading-spaced {
+    margin-top: 24px;
+}
+
+.announcement-card-spaced {
+    margin-top: 8px;
+}
+
 .ann-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 10px;
     margin-bottom: 4px;
+}
+
+.announcement-meta-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 .ann-title {
@@ -589,7 +650,6 @@ body {
     box-shadow: 0 0 0 3px rgba(22,163,74,0.12);
 }
 
-/* ── Select Input ──────────────────────────────────────────────────────────── */
 .select-input {
     width: 100%;
     padding: 10px 14px;
@@ -609,17 +669,19 @@ body {
     box-shadow: 0 0 0 3px rgba(22,163,74,0.12);
 }
 
-/* ── 5-column table ────────────────────────────────────────────────────────── */
+.select-input-compact {
+    padding: 4px 8px;
+    font-size: 12px;
+}
+
 .table-5col {
     grid-template-columns: 1.4fr 1fr 1fr 0.6fr 80px;
 }
 
-/* ── Events table (5 col with wider actions) ──────────────────────────────── */
 .table-events {
     grid-template-columns: 1.2fr 1fr 1fr 0.5fr 140px;
 }
 
-/* ── Navbar Hours Badge ────────────────────────────────────────────────────── */
 .nav-hours-badge {
     display: inline-flex;
     align-items: center;
@@ -632,7 +694,6 @@ body {
     letter-spacing: -0.01em;
 }
 
-/* ── Title Card (fixed right) ─────────────────────────────────────────────── */
 .title-card {
     position: fixed;
     top: 80px;
@@ -668,7 +729,6 @@ body {
     color: var(--gray-500);
 }
 
-/* ── Multi-select ─────────────────────────────────────────────────────────── */
 .multi-select {
     position: relative;
 }
@@ -732,7 +792,32 @@ body {
     height: 16px;
 }
 
-/* ── Hours Tracker ─────────────────────────────────────────────────────────── */
+.select-all-label {
+    font-weight: 600;
+}
+
+.dashboard-hours {
+    margin-top: 40px;
+}
+
+.hours-filter {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.hours-filter-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gray-700);
+}
+
+.hours-filter-select {
+    width: auto;
+    min-width: 200px;
+}
+
 .hours-summary {
     display: flex;
     align-items: center;
@@ -787,83 +872,6 @@ body {
     white-space: nowrap;
 }
 
-/* ── Roles List ────────────────────────────────────────────────────────────── */
-.roles-list {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.role-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: white;
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius);
-    padding: 12px 20px;
-    transition: box-shadow 0.15s;
-}
-
-.role-item:hover { box-shadow: var(--shadow-md); }
-
-.role-item-left {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.role-rank {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 26px;
-    background: var(--green-100);
-    color: var(--green-700);
-    font-size: 12px;
-    font-weight: 700;
-    border-radius: 100px;
-}
-
-.role-name {
-    font-size: 14px;
-    font-weight: 600;
-}
-
-.role-item-right {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.btn-role-arrow {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 30px;
-    height: 30px;
-    border: 1px solid var(--gray-300);
-    border-radius: var(--radius-sm);
-    background: white;
-    font-size: 12px;
-    color: var(--gray-600);
-    cursor: pointer;
-    transition: all 0.15s;
-}
-
-.btn-role-arrow:hover:not(:disabled) {
-    border-color: var(--green-400);
-    color: var(--green-700);
-    background: var(--green-50);
-}
-
-.btn-role-arrow:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
-}
-
-/* ── Colored Event Cards (tutor RSVP status) ─────────────────────────────── */
 .event-card-yes {
     border-left: 4px solid var(--green-500);
     background: linear-gradient(90deg, var(--green-50) 0%, transparent 30%);
@@ -879,7 +887,6 @@ body {
     background: linear-gradient(90deg, #fef2f2 0%, transparent 30%);
 }
 
-/* ── Mascot ───────────────────────────────────────────────────────────────── */
 .mascot-container {
     position: fixed;
     bottom: 24px;
@@ -938,7 +945,6 @@ body {
     filter: drop-shadow(0 2px 6px rgba(0,0,0,0.12));
 }
 
-/* ── Responsive ────────────────────────────────────────────────────────────── */
 @media (max-width: 700px) {
     .event-card {
         flex-direction: column;

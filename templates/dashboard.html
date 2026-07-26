@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BrainSprouts - Dashboard</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
@@ -14,23 +13,21 @@
             <span class="nav-brand">BrainSprouts</span>
         </div>
         <div class="nav-right">
-            <span class="nav-hours-badge" id="navHours" title="Total hours logged">0.0h</span>
+            <span class="nav-hours-badge" id="navHours">0.0h</span>
             <span class="nav-user" id="navUser"></span>
             <button class="btn btn-ghost" onclick="logout()">Sign Out</button>
         </div>
     </nav>
 
-    <!-- Title Card (right side) -->
-    <div class="title-card" id="titleCard">
+    <div class="title-card">
         <div class="title-card-label">Executive Level</div>
         <div class="title-card-value" id="titleCardValue">Jr. Tutor</div>
         <div class="title-card-name" id="titleCardName"></div>
     </div>
 
-    <!-- Mascot (left side) -->
     <div class="mascot-container">
         <div class="mascot-bubble">Please sign up for an event! $5 Monopoly money if you do</div>
-        <img class="mascot-panda" src="/static/images/mascot.png" alt="BrainSprouts mascot">
+        <img class="mascot-panda" src="/static/images/mascot.png">
     </div>
 
     <main class="container">
@@ -41,12 +38,9 @@
             <p class="text-muted">Mark your availability for upcoming sessions below.</p>
         </div>
 
-        <div class="calendar-grid" id="calendarGrid">
-            <!-- Populated by JS -->
-        </div>
+        <div class="calendar-grid" id="calendarGrid"></div>
 
-        <!-- My Hours Section -->
-        <div style="margin-top:40px;">
+        <div class="dashboard-hours">
             <div class="page-header">
                 <h2>My Hours</h2>
                 <p class="text-muted">Hours logged by the administrator for your work.</p>
@@ -57,40 +51,28 @@
 
     <script>
         const token = localStorage.getItem('bs_token');
-        const user = JSON.parse(localStorage.getItem('bs_user') || 'null');
+        const user = JSON.parse(localStorage.getItem('bs_user'));
         if (!token || !user) { window.location.href = '/'; }
         if (user && user.is_admin) { window.location.href = '/admin'; }
 
         document.getElementById('navUser').textContent = user ? user.display_name : '';
 
-        const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-        const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+        const statusLabels = { yes: 'Attending', maybe: 'Maybe', no: 'Not Attending', null: 'No Response' };
+        const statusClasses = { yes: 'status-yes', maybe: 'status-maybe', no: 'status-no', null: 'status-none' };
 
         function formatDate(dateStr) {
-            const d = new Date(dateStr + 'T12:00:00');
-            return `${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`;
+            return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+            });
         }
 
-        function statusLabel(s) {
-            if (s === 'yes') return 'Attending';
-            if (s === 'maybe') return 'Maybe';
-            if (s === 'no') return 'Not Attending';
-            return 'No Response';
-        }
-
-        function statusClass(s) {
-            if (s === 'yes') return 'status-yes';
-            if (s === 'maybe') return 'status-maybe';
-            if (s === 'no') return 'status-no';
-            return 'status-none';
-        }
-
-        function fmtTime(t) {
-            const [h, m] = t.split(':');
-            const hr = parseInt(h);
-            const ampm = hr >= 12 ? 'PM' : 'AM';
-            const h12 = hr % 12 || 12;
-            return `${h12}:${m} ${ampm}`;
+        function formatTime(time) {
+            return new Date(`2000-01-01T${time}`).toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit',
+            });
         }
 
         async function loadEvents() {
@@ -104,7 +86,6 @@
 
         function renderCalendar(events) {
             const grid = document.getElementById('calendarGrid');
-            // Group by month
             const byMonth = {};
             events.forEach(ev => {
                 const month = ev.date.substring(0, 7);
@@ -116,7 +97,7 @@
             for (const [month, evts] of Object.entries(byMonth)) {
                 const d = new Date(month + '-15');
                 html += `<div class="month-section">
-                    <h3 class="month-title">${MONTHS[d.getMonth()]} ${d.getFullYear()}</h3>
+                    <h3 class="month-title">${d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h3>
                     <div class="events-list">`;
                 evts.forEach(ev => {
                     const isPast = new Date(ev.date + 'T23:59:59') < new Date();
@@ -125,25 +106,22 @@
                     <div class="event-card ${isPast ? 'event-past' : ''} ${statusBorder}">
                         <div class="event-info">
                             <div class="event-date">${formatDate(ev.date)}</div>
-                            <div class="event-time">${fmtTime(ev.start_time)} - ${fmtTime(ev.end_time)} &middot; ${escapeHtml(ev.title)}</div>
+                            <div class="event-time">${formatTime(ev.start_time)} - ${formatTime(ev.end_time)} &middot; ${ev.title}</div>
                             <div class="event-meta">
-                                <span class="badge ${statusClass(ev.my_status)}">${statusLabel(ev.my_status)}</span>
+                                <span class="badge ${statusClasses[ev.my_status]}">${statusLabels[ev.my_status]}</span>
                                 <span class="spots-info">${ev.yes_count}/${ev.max_capacity} confirmed</span>
                                 ${ev.at_capacity && ev.my_status !== 'yes' ? '<span class="capacity-full">Full</span>' : ''}
                             </div>
                         </div>
                         ${!isPast ? `
                         <div class="event-actions">
-                            <button class="btn-rsvp ${ev.my_status === 'yes' ? 'active' : ''}" onclick="rsvp('${ev.date}','yes')" ${ev.at_capacity && ev.my_status !== 'yes' ? 'disabled title="At capacity"' : ''}>
-                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M13.3 4.3L6.5 11.1 2.7 7.3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            <button class="btn-rsvp ${ev.my_status === 'yes' ? 'active' : ''}" onclick="rsvp('${ev.date}','yes')" ${ev.at_capacity && ev.my_status !== 'yes' ? 'disabled' : ''}>
                                 Yes
                             </button>
                             <button class="btn-rsvp btn-maybe ${ev.my_status === 'maybe' ? 'active' : ''}" onclick="rsvp('${ev.date}','maybe')">
-                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2"/><path d="M8 5v3M8 10v1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                                 Maybe
                             </button>
                             <button class="btn-rsvp btn-no ${ev.my_status === 'no' ? 'active' : ''}" onclick="rsvp('${ev.date}','no')">
-                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                                 No
                             </button>
                         </div>` : '<div class="event-actions"><span class="text-muted">Past</span></div>'}
@@ -165,7 +143,7 @@
             });
             const data = await res.json();
             if (!res.ok) {
-                alert(data.error || 'Failed to update');
+                alert(data.detail);
                 return;
             }
             loadEvents();
@@ -181,7 +159,6 @@
             const res = await fetch('/api/announcements', {
                 headers: { 'Authorization': 'Bearer ' + token }
             });
-            if (!res.ok) return;
             const anns = await res.json();
             const container = document.getElementById('announcementsBanner');
             if (anns.length === 0) { container.innerHTML = ''; return; }
@@ -191,27 +168,20 @@
                 const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                 html += `<div class="announcement-card">
                     <div class="ann-header">
-                        <span class="ann-title">${escapeHtml(a.title)}</span>
+                        <span class="ann-title">${a.title}</span>
                         <span class="ann-date">${dateStr}</span>
                     </div>
-                    <p class="ann-body">${escapeHtml(a.body)}</p>
+                    <p class="ann-body">${a.body}</p>
                 </div>`;
             });
             html += '</div>';
             container.innerHTML = html;
         }
 
-        function escapeHtml(str) {
-            const div = document.createElement('div');
-            div.textContent = str;
-            return div.innerHTML;
-        }
-
         async function loadMyHours() {
             const res = await fetch('/api/hours', {
                 headers: { 'Authorization': 'Bearer ' + token }
             });
-            if (!res.ok) return;
             const hours = await res.json();
             const container = document.getElementById('myHoursSection');
 
@@ -232,7 +202,7 @@
                 html += `<div class="hours-entry">
                     <div class="hours-entry-info">
                         <div class="event-date">${formatDate(h.work_date)}</div>
-                        <div class="event-time">${escapeHtml(h.description || 'No description')}</div>
+                        <div class="event-time">${h.description || 'No description'}</div>
                     </div>
                     <div class="hours-entry-value">${h.hours}h</div>
                 </div>`;
@@ -245,10 +215,9 @@
             const res = await fetch('/api/me', {
                 headers: { 'Authorization': 'Bearer ' + token }
             });
-            if (!res.ok) return;
             const me = await res.json();
             document.getElementById('navHours').textContent = me.total_hours.toFixed(1) + 'h';
-            document.getElementById('titleCardValue').textContent = me.executive_title || 'Jr. Tutor';
+            document.getElementById('titleCardValue').textContent = me.executive_title;
             document.getElementById('titleCardName').textContent = me.display_name;
         }
 

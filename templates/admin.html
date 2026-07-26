@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BrainSprouts - Admin</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
@@ -20,13 +19,11 @@
             <button class="btn btn-ghost tab-btn" data-tab="announcements" onclick="switchTab('announcements')">Announcements</button>
             <button class="btn btn-ghost tab-btn" data-tab="users" onclick="switchTab('users')">Manage Tutors</button>
             <button class="btn btn-ghost tab-btn" data-tab="hours" onclick="switchTab('hours')">Hours</button>
-            <button class="btn btn-ghost tab-btn" data-tab="roles" onclick="switchTab('roles')">Roles</button>
             <button class="btn btn-ghost" onclick="logout()">Sign Out</button>
         </div>
     </nav>
 
     <main class="container">
-        <!-- Schedule Tab -->
         <div id="tab-schedule" class="tab-content">
             <div class="page-header">
                 <h2>Session Overview</h2>
@@ -35,14 +32,12 @@
             <div id="adminEvents"></div>
         </div>
 
-        <!-- Manage Events Tab -->
-        <div id="tab-events" class="tab-content" style="display:none;">
+        <div id="tab-events" class="tab-content is-hidden">
             <div class="page-header">
                 <h2>Manage Events</h2>
-                <p class="text-muted">Add single events, create repeating series, or remove events.</p>
+                <p class="text-muted">Add, edit, or remove events.</p>
             </div>
 
-            <!-- Single Event -->
             <div class="create-user-card">
                 <h3>Add Single Event</h3>
                 <form id="createEventForm">
@@ -56,7 +51,7 @@
                             <input type="date" id="evDate" required>
                         </div>
                     </div>
-                    <div class="form-row" style="margin-top:12px;">
+                    <div class="form-row form-row-spaced">
                         <div class="form-group">
                             <label for="evStart">Start Time</label>
                             <input type="time" id="evStart" required value="16:00">
@@ -72,103 +67,45 @@
                         <button type="submit" class="btn btn-primary btn-create">Add Event</button>
                     </div>
                 </form>
-                <div id="evMsg" class="msg" style="display:none;"></div>
+                <div id="evMsg" class="msg is-hidden"></div>
             </div>
 
-            <!-- Repeating Events -->
-            <div class="create-user-card">
-                <h3>Create Repeating Events</h3>
-                <form id="repeatEventForm">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="repTitle">Title</label>
-                            <input type="text" id="repTitle" required placeholder="e.g. Tutoring Session" value="Tutoring Session">
-                        </div>
-                        <div class="form-group">
-                            <label for="repDay">Day of Week</label>
-                            <select id="repDay" required class="select-input">
-                                <option value="0">Monday</option>
-                                <option value="1">Tuesday</option>
-                                <option value="2" selected>Wednesday</option>
-                                <option value="3">Thursday</option>
-                                <option value="4">Friday</option>
-                                <option value="5">Saturday</option>
-                                <option value="6">Sunday</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-row" style="margin-top:12px;">
-                        <div class="form-group">
-                            <label for="repStartDate">From</label>
-                            <input type="date" id="repStartDate" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="repEndDate">Until</label>
-                            <input type="date" id="repEndDate" required>
-                        </div>
-                    </div>
-                    <div class="form-row" style="margin-top:12px;">
-                        <div class="form-group">
-                            <label for="repStart">Start Time</label>
-                            <input type="time" id="repStart" required value="16:00">
-                        </div>
-                        <div class="form-group">
-                            <label for="repEnd">End Time</label>
-                            <input type="time" id="repEnd" required value="17:00">
-                        </div>
-                        <div class="form-group">
-                            <label for="repCapacity">Max Capacity</label>
-                            <input type="number" id="repCapacity" required value="15" min="1">
-                        </div>
-                    </div>
-                    <div class="form-group" style="margin-top:12px;">
-                        <label for="repSkip">Skip Dates <span class="text-muted">(comma-separated, e.g. 2026-04-29, 2026-05-06)</span></label>
-                        <input type="text" id="repSkip" placeholder="Optional">
-                    </div>
-                    <button type="submit" class="btn btn-primary" style="width:auto;margin-top:8px;">Create Series</button>
-                </form>
-                <div id="repMsg" class="msg" style="display:none;"></div>
-            </div>
-
-            <!-- Event List -->
             <div id="eventList"></div>
         </div>
 
-        <!-- Users Tab -->
-        <div id="tab-users" class="tab-content" style="display:none;">
+        <div id="tab-users" class="tab-content is-hidden">
             <div class="page-header">
                 <h2>Manage Tutors</h2>
-                <p class="text-muted">Create login credentials for tutors. They can sign in immediately.</p>
+                <p class="text-muted">"The most valuable asset are humans!" - Andy</p>
             </div>
 
             <div class="create-user-card">
-                <h3>Create New Tutor Account</h3>
+                <h3>New Tutor Creation</h3>
                 <form id="createUserForm" class="form-row">
                     <div class="form-group">
                         <label for="newDisplay">Display Name</label>
-                        <input type="text" id="newDisplay" required placeholder="e.g. Jane Smith">
+                        <input type="text" id="newDisplay" required placeholder="e.g. Andy Yu">
                     </div>
                     <div class="form-group">
                         <label for="newUsername">Username</label>
-                        <input type="text" id="newUsername" required placeholder="e.g. jsmith">
+                        <input type="text" id="newUsername" required placeholder="e.g. AndyYuIsSoCool">
                     </div>
                     <div class="form-group">
                         <label for="newPassword">Password</label>
-                        <input type="text" id="newPassword" required placeholder="Min 6 characters">
+                        <input type="text" id="newPassword" required placeholder="Min 6 character!">
                     </div>
-                    <button type="submit" class="btn btn-primary btn-create">Create Account</button>
+                    <button type="submit" class="btn btn-primary btn-create">Create Account!!</button>
                 </form>
-                <div id="createMsg" class="msg" style="display:none;"></div>
+                <div id="createMsg" class="msg is-hidden"></div>
             </div>
 
             <div class="users-list" id="usersList"></div>
         </div>
 
-        <!-- Announcements Tab -->
-        <div id="tab-announcements" class="tab-content" style="display:none;">
+        <div id="tab-announcements" class="tab-content is-hidden">
             <div class="page-header">
                 <h2>Announcements</h2>
-                <p class="text-muted">Post announcements visible to all tutors on their dashboard.</p>
+                <p class="text-muted">Better hope they read them haha</p>
             </div>
 
             <div class="create-user-card">
@@ -180,18 +117,17 @@
                     </div>
                     <div class="form-group">
                         <label for="annBody">Message</label>
-                        <textarea id="annBody" required placeholder="Write your announcement here..." rows="3" class="textarea"></textarea>
+                        <textarea id="annBody" required placeholder="Write your announcement here. Just cross your fingers they'll read it muahaha..." rows="4" class="textarea"></textarea>
                     </div>
-                    <button type="submit" class="btn btn-primary" style="width:auto;">Post Announcement</button>
+                    <button type="submit" class="btn btn-primary btn-auto-width">Post Announcement</button>
                 </form>
-                <div id="annMsg" class="msg" style="display:none;"></div>
+                <div id="annMsg" class="msg is-hidden"></div>
             </div>
 
             <div id="annList"></div>
         </div>
 
-        <!-- Hours Tab -->
-        <div id="tab-hours" class="tab-content" style="display:none;">
+        <div id="tab-hours" class="tab-content is-hidden">
             <div class="page-header">
                 <h2>Hour Tracker</h2>
                 <p class="text-muted">Log and manage tutor hours.</p>
@@ -201,12 +137,11 @@
                 <h3>Log Hours</h3>
                 <form id="logHoursForm">
                     <div class="form-row">
-                        <div class="form-group" style="min-width:240px;">
+                        <div class="form-group form-group-tutor-select">
                             <label>Tutors</label>
                             <div class="multi-select" id="hrTutorSelect">
                                 <div class="multi-select-toggle" onclick="toggleMultiSelect()">
                                     <span id="hrTutorLabel">Select tutors...</span>
-                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                 </div>
                                 <div class="multi-select-dropdown" id="hrTutorDropdown"></div>
                             </div>
@@ -220,19 +155,18 @@
                             <input type="number" id="hrHours" required min="0.25" step="0.25" placeholder="e.g. 1.5">
                         </div>
                     </div>
-                    <div class="form-group" style="margin-top:12px;">
+                    <div class="form-group form-group-spaced">
                         <label for="hrDesc">Description <span class="text-muted">(optional)</span></label>
                         <input type="text" id="hrDesc" placeholder="e.g. Tutoring session, Training, etc.">
                     </div>
-                    <button type="submit" class="btn btn-primary" style="width:auto;margin-top:8px;">Log Hours</button>
+                    <button type="submit" class="btn btn-primary btn-log-hours">Log Hours</button>
                 </form>
-                <div id="hrMsg" class="msg" style="display:none;"></div>
+                <div id="hrMsg" class="msg is-hidden"></div>
             </div>
 
-            <!-- Filter by tutor -->
-            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-                <label style="font-size:13px;font-weight:600;color:var(--gray-700);">Filter by tutor:</label>
-                <select id="hrFilter" class="select-input" style="width:auto;min-width:200px;">
+            <div class="hours-filter">
+                <label class="hours-filter-label">Filter by tutor:</label>
+                <select id="hrFilter" class="select-input hours-filter-select">
                     <option value="">All Tutors</option>
                 </select>
             </div>
@@ -240,79 +174,47 @@
             <div id="hoursList"></div>
         </div>
 
-        <!-- Roles Tab -->
-        <div id="tab-roles" class="tab-content" style="display:none;">
-            <div class="page-header">
-                <h2>Manage Roles</h2>
-                <p class="text-muted">Create roles and arrange them by hierarchy. Higher = more senior.</p>
-            </div>
-
-            <div class="create-user-card">
-                <h3>Create New Role</h3>
-                <form id="createRoleForm" class="form-row">
-                    <div class="form-group">
-                        <label for="newRoleName">Role Name</label>
-                        <input type="text" id="newRoleName" required placeholder="e.g. Program Coordinator">
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-create">Add Role</button>
-                </form>
-                <div id="roleMsg" class="msg" style="display:none;"></div>
-            </div>
-
-            <div id="rolesList"></div>
-        </div>
     </main>
 
     <script>
         const token = localStorage.getItem('bs_token');
-        const user = JSON.parse(localStorage.getItem('bs_user') || 'null');
+        const user = JSON.parse(localStorage.getItem('bs_user'));
         if (!token || !user || !user.is_admin) { window.location.href = '/'; }
 
-        const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-        const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+        const titles = ['Jr. Tutor', 'Reserve Tutor', 'Tutor', 'Sr. Tutor', 'Lead Tutor', 'Executive Tutor'];
 
         function formatDate(dateStr) {
-            const d = new Date(dateStr + 'T12:00:00');
-            return `${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`;
+            return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+            });
         }
 
-        function fmtTime(t) {
-            const [h, m] = t.split(':');
-            const hr = parseInt(h);
-            const ampm = hr >= 12 ? 'PM' : 'AM';
-            const h12 = hr % 12 || 12;
-            return `${h12}:${m} ${ampm}`;
-        }
-
-        function escapeHtml(str) {
-            const div = document.createElement('div');
-            div.textContent = str;
-            return div.innerHTML;
+        function formatTime(time) {
+            return new Date(`2000-01-01T${time}`).toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit',
+            });
         }
 
         function showMsg(el, ok, text) {
-            el.style.display = 'block';
             el.className = ok ? 'msg msg-success' : 'msg msg-error';
             el.textContent = text;
-            setTimeout(() => el.style.display = 'none', 3000);
+            setTimeout(() => el.classList.add('is-hidden'), 3000);
         }
 
-        // ── Tabs ──
-
         function switchTab(tab) {
-            document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('is-hidden'));
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-            document.getElementById('tab-' + tab).style.display = 'block';
+            document.getElementById('tab-' + tab).classList.remove('is-hidden');
             document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
             if (tab === 'schedule') loadAdminEvents();
             if (tab === 'events') loadEventList();
             if (tab === 'users') loadUsers();
             if (tab === 'announcements') loadAnnouncements();
             if (tab === 'hours') { loadHoursTutorDropdowns(); loadHours(); }
-            if (tab === 'roles') loadRoles();
         }
-
-        // ── Schedule ──
 
         async function loadAdminEvents() {
             const res = await fetch('/api/admin/events', {
@@ -340,7 +242,7 @@
             for (const [month, evts] of Object.entries(byMonth)) {
                 const d = new Date(month + '-15');
                 html += `<div class="month-section">
-                    <h3 class="month-title">${MONTHS[d.getMonth()]} ${d.getFullYear()}</h3>`;
+                    <h3 class="month-title">${d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h3>`;
                 evts.forEach(ev => {
                     const isPast = new Date(ev.date + 'T23:59:59') < new Date();
                     const yesRsvps = ev.rsvps.filter(r => r.status === 'yes');
@@ -353,7 +255,7 @@
                         <div class="admin-event-header">
                             <div>
                                 <div class="event-date">${formatDate(ev.date)}</div>
-                                <div class="event-time">${fmtTime(ev.start_time)} - ${fmtTime(ev.end_time)} &middot; ${escapeHtml(ev.title)}</div>
+                                <div class="event-time">${formatTime(ev.start_time)} - ${formatTime(ev.end_time)} &middot; ${ev.title}</div>
                             </div>
                             <div class="admin-counts">
                                 <span class="count-badge count-yes">${ev.yes_count} Yes</span>
@@ -384,8 +286,6 @@
             container.innerHTML = html;
         }
 
-        // ── Manage Events ──
-
         let allEvents = [];
 
         async function loadEventList() {
@@ -399,41 +299,25 @@
         function renderEventList() {
             const container = document.getElementById('eventList');
             if (allEvents.length === 0) {
-                container.innerHTML = '<p class="text-muted" style="margin-top:16px;">No events yet.</p>';
+                container.innerHTML = '<p class="text-muted content-empty-spaced">No events yet.</p>';
                 return;
             }
 
-            // Group by title for "Delete Series" buttons
-            const titles = [...new Set(allEvents.map(ev => ev.title))];
-            const seriesCounts = {};
-            titles.forEach(t => { seriesCounts[t] = allEvents.filter(ev => ev.title === t).length; });
-
             let html = '';
 
-            // Show "Delete Series" buttons for titles with multiple events
-            const seriesTitles = titles.filter(t => seriesCounts[t] > 1);
-            if (seriesTitles.length > 0) {
-                html += '<div style="margin-top:24px;margin-bottom:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">';
-                html += '<span style="font-size:13px;font-weight:600;color:var(--gray-700);">Delete entire series:</span>';
-                seriesTitles.forEach(t => {
-                    html += `<button class="btn btn-danger-ghost" onclick="deleteEventSeries('${escapeHtml(t)}')">${escapeHtml(t)} (${seriesCounts[t]})</button>`;
-                });
-                html += '</div>';
-            }
-
-            html += '<h3 style="margin-top:16px;">All Events</h3><div class="users-table" style="margin-top:8px;">';
+            html += '<h3 class="section-heading-spaced">All Events</h3><div class="users-table table-spaced-sm">';
             html += `<div class="table-header table-events">
                 <span>Date</span><span>Title</span><span>Time</span><span>Capacity</span><span></span>
             </div>`;
             allEvents.forEach(ev => {
                 html += `<div class="table-row table-events" id="ev-row-${ev.id}">
                     <span class="user-name">${formatDate(ev.date)}</span>
-                    <span>${escapeHtml(ev.title)}</span>
-                    <span class="text-muted">${fmtTime(ev.start_time)} - ${fmtTime(ev.end_time)}</span>
+                    <span>${ev.title}</span>
+                    <span class="text-muted">${formatTime(ev.start_time)} - ${formatTime(ev.end_time)}</span>
                     <span class="text-muted">${ev.yes_count}/${ev.max_capacity}</span>
-                    <span style="display:flex;gap:4px;">
-                        <button class="btn btn-danger-ghost" style="border-color:var(--gray-300);color:var(--gray-600);" onclick="editEvent(${ev.id})">Edit</button>
-                        <button class="btn btn-danger-ghost" onclick="deleteEvent(${ev.id}, '${ev.date}')">Delete</button>
+                    <span class="inline-actions">
+                        <button class="btn btn-danger-ghost btn-secondary-ghost" onclick="editEvent(${ev.id})">Edit</button>
+                        <button class="btn btn-danger-ghost" onclick="deleteEvent(${ev.id})">Delete</button>
                     </span>
                 </div>`;
             });
@@ -456,55 +340,30 @@
                 }),
             });
             const data = await res.json();
-            showMsg(msgEl, res.ok, data.message || data.error);
+            showMsg(msgEl, res.ok, res.ok ? data.message : data.detail);
             if (res.ok) { document.getElementById('evDate').value = ''; loadEventList(); }
-        });
-
-        document.getElementById('repeatEventForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const msgEl = document.getElementById('repMsg');
-            const skipRaw = document.getElementById('repSkip').value.trim();
-            const skipDates = skipRaw ? skipRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
-            const res = await fetch('/api/admin/events/repeat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-                body: JSON.stringify({
-                    title: document.getElementById('repTitle').value,
-                    day_of_week: parseInt(document.getElementById('repDay').value),
-                    start_date: document.getElementById('repStartDate').value,
-                    end_date: document.getElementById('repEndDate').value,
-                    start_time: document.getElementById('repStart').value,
-                    end_time: document.getElementById('repEnd').value,
-                    max_capacity: parseInt(document.getElementById('repCapacity').value),
-                    skip_dates: skipDates,
-                }),
-            });
-            const data = await res.json();
-            showMsg(msgEl, res.ok, data.message || data.error);
-            if (res.ok) { document.getElementById('repeatEventForm').reset(); loadEventList(); }
         });
 
         function editEvent(id) {
             const ev = allEvents.find(e => e.id === id);
-            if (!ev) return;
             const row = document.getElementById('ev-row-' + id);
             row.innerHTML = `
                 <span class="user-name">${formatDate(ev.date)}</span>
-                <span><input type="text" id="editEvTitle-${id}" value="${escapeHtml(ev.title)}" style="width:100%;padding:4px 8px;border:1px solid var(--gray-300);border-radius:4px;font-family:inherit;font-size:13px;"></span>
-                <span style="display:flex;gap:4px;">
-                    <input type="time" id="editEvStart-${id}" value="${ev.start_time}" style="padding:4px 6px;border:1px solid var(--gray-300);border-radius:4px;font-family:inherit;font-size:13px;">
-                    <input type="time" id="editEvEnd-${id}" value="${ev.end_time}" style="padding:4px 6px;border:1px solid var(--gray-300);border-radius:4px;font-family:inherit;font-size:13px;">
+                <span><input type="text" id="editEvTitle-${id}" value="${ev.title}" class="inline-edit-input inline-edit-input-full"></span>
+                <span class="inline-actions">
+                    <input type="time" id="editEvStart-${id}" value="${ev.start_time}" class="inline-edit-input inline-edit-input-time">
+                    <input type="time" id="editEvEnd-${id}" value="${ev.end_time}" class="inline-edit-input inline-edit-input-time">
                 </span>
-                <span><input type="number" id="editEvCap-${id}" value="${ev.max_capacity}" min="1" style="width:60px;padding:4px 8px;border:1px solid var(--gray-300);border-radius:4px;font-family:inherit;font-size:13px;"></span>
-                <span style="display:flex;gap:4px;">
-                    <button class="btn btn-danger-ghost" style="border-color:var(--green-600);color:var(--green-700);" onclick="saveEvent(${id})">Save</button>
-                    <button class="btn btn-danger-ghost" style="border-color:var(--gray-300);color:var(--gray-600);" onclick="renderEventList()">Cancel</button>
+                <span><input type="number" id="editEvCap-${id}" value="${ev.max_capacity}" min="1" class="inline-edit-input inline-edit-input-capacity"></span>
+                <span class="inline-actions">
+                    <button class="btn btn-danger-ghost btn-save-ghost" onclick="saveEvent(${id})">Save</button>
+                    <button class="btn btn-danger-ghost btn-secondary-ghost" onclick="renderEventList()">Cancel</button>
                 </span>
             `;
         }
 
         async function saveEvent(id) {
-            const res = await fetch(`/api/admin/events/${id}`, {
+            await fetch(`/api/admin/events/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
                 body: JSON.stringify({
@@ -514,12 +373,10 @@
                     max_capacity: parseInt(document.getElementById('editEvCap-' + id).value),
                 }),
             });
-            if (res.ok) loadEventList();
-            else alert('Failed to update event');
+            loadEventList();
         }
 
-        async function deleteEvent(id, date) {
-            if (!confirm(`Delete the event on ${date}? This will also remove all RSVPs for it.`)) return;
+        async function deleteEvent(id) {
             await fetch(`/api/admin/events/${id}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': 'Bearer ' + token },
@@ -527,35 +384,10 @@
             loadEventList();
         }
 
-        async function deleteEventSeries(title) {
-            const count = allEvents.filter(ev => ev.title === title).length;
-            if (!confirm(`Delete ALL ${count} "${title}" events? This will also remove all their RSVPs.`)) return;
-            const res = await fetch('/api/admin/events/by-title', {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-                body: JSON.stringify({ title }),
-            });
-            if (res.ok) loadEventList();
-            else alert('Failed to delete series');
-        }
-
-        // ── Users ──
-
-        let cachedRoles = [];
-
-        async function fetchRoles() {
-            const res = await fetch('/api/roles', {
-                headers: { 'Authorization': 'Bearer ' + token }
-            });
-            cachedRoles = await res.json();
-            return cachedRoles;
-        }
-
         async function loadUsers() {
-            const [usersRes] = await Promise.all([
-                fetch('/api/admin/users', { headers: { 'Authorization': 'Bearer ' + token } }),
-                cachedRoles.length ? Promise.resolve() : fetchRoles(),
-            ]);
+            const usersRes = await fetch('/api/admin/users', {
+                headers: { 'Authorization': 'Bearer ' + token },
+            });
             const users = await usersRes.json();
             const list = document.getElementById('usersList');
             let html = '<h3>Current Tutors</h3><div class="users-table">';
@@ -563,15 +395,15 @@
                 <span>Name</span><span>Username</span><span>Executive Title</span><span>Created</span><span></span>
             </div>`;
             users.forEach(u => {
-                const titleSelect = !u.is_admin ? `<select class="select-input" style="padding:4px 8px;font-size:12px;" onchange="updateTitle(${u.id}, this.value)">
-                    ${cachedRoles.map(r => `<option value="${escapeHtml(r.name)}" ${(u.executive_title || 'Jr. Tutor') === r.name ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
+                const titleSelect = !u.is_admin ? `<select class="select-input select-input-compact" onchange="updateTitle(${u.id}, this.value)">
+                    ${titles.map(title => `<option value="${title}" ${u.executive_title === title ? 'selected' : ''}>${title}</option>`).join('')}
                     </select>` : '';
                 html += `<div class="table-row table-5col">
                     <span class="user-name">${u.display_name} ${u.is_admin ? '<span class="nav-badge">Admin</span>' : ''}</span>
                     <span class="text-muted">${u.username}</span>
                     <span>${titleSelect}</span>
                     <span class="text-muted">${u.created_at ? u.created_at.split('T')[0] : ''}</span>
-                    <span>${!u.is_admin ? `<button class="btn btn-danger-ghost" onclick="deleteUser(${u.id}, '${u.display_name}')">Remove</button>` : ''}</span>
+                    <span>${!u.is_admin ? `<button class="btn btn-danger-ghost" onclick="deleteUser(${u.id})">Remove</button>` : ''}</span>
                 </div>`;
             });
             html += '</div>';
@@ -579,12 +411,11 @@
         }
 
         async function updateTitle(userId, title) {
-            const res = await fetch(`/api/admin/users/${userId}/title`, {
+            await fetch(`/api/admin/users/${userId}/title`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
                 body: JSON.stringify({ executive_title: title }),
             });
-            if (!res.ok) alert('Failed to update title');
         }
 
         document.getElementById('createUserForm').addEventListener('submit', async (e) => {
@@ -600,20 +431,17 @@
                 }),
             });
             const data = await res.json();
-            showMsg(msgEl, res.ok, res.ok ? 'Account created successfully!' : (data.error || 'Failed'));
+            showMsg(msgEl, res.ok, res.ok ? 'Account created successfully!' : data.detail);
             if (res.ok) { document.getElementById('createUserForm').reset(); loadUsers(); }
         });
 
-        async function deleteUser(id, name) {
-            if (!confirm(`Remove ${name}? This will also delete their RSVP history.`)) return;
+        async function deleteUser(id) {
             await fetch(`/api/admin/users/${id}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': 'Bearer ' + token },
             });
             loadUsers();
         }
-
-        // ── Announcements ──
 
         async function loadAnnouncements() {
             const res = await fetch('/api/announcements', {
@@ -622,22 +450,22 @@
             const anns = await res.json();
             const container = document.getElementById('annList');
             if (anns.length === 0) {
-                container.innerHTML = '<p class="text-muted" style="margin-top:16px;">No announcements yet.</p>';
+                container.innerHTML = '<p class="text-muted content-empty-spaced">No announcements yet.</p>';
                 return;
             }
-            let html = '<h3 style="margin-top:24px;">Previous Announcements</h3>';
+            let html = '<h3 class="announcement-heading-spaced">Previous Announcements</h3>';
             anns.forEach(a => {
                 const date = new Date(a.created_at + 'Z');
                 const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                html += `<div class="announcement-card" style="margin-top:8px;">
+                html += `<div class="announcement-card announcement-card-spaced">
                     <div class="ann-header">
-                        <span class="ann-title">${escapeHtml(a.title)}</span>
-                        <div style="display:flex;align-items:center;gap:10px;">
+                        <span class="ann-title">${a.title}</span>
+                        <div class="announcement-meta-actions">
                             <span class="ann-date">${dateStr}</span>
                             <button class="btn btn-danger-ghost" onclick="deleteAnnouncement(${a.id})">Delete</button>
                         </div>
                     </div>
-                    <p class="ann-body">${escapeHtml(a.body)}</p>
+                    <p class="ann-body">${a.body}</p>
                 </div>`;
             });
             container.innerHTML = html;
@@ -655,20 +483,17 @@
                 }),
             });
             const data = await res.json();
-            showMsg(msgEl, res.ok, res.ok ? 'Announcement posted!' : (data.error || 'Failed'));
+            showMsg(msgEl, res.ok, res.ok ? 'Announcement posted!' : data.detail);
             if (res.ok) { document.getElementById('createAnnForm').reset(); loadAnnouncements(); }
         });
 
         async function deleteAnnouncement(id) {
-            if (!confirm('Delete this announcement?')) return;
             await fetch(`/api/admin/announcements/${id}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': 'Bearer ' + token },
             });
             loadAnnouncements();
         }
-
-        // ── Hours ──
 
         let allHours = [];
 
@@ -679,21 +504,17 @@
             dd.classList.toggle('open');
         }
 
-        // Close dropdown when clicking outside
         document.addEventListener('click', (e) => {
             const sel = document.getElementById('hrTutorSelect');
-            if (sel && !sel.contains(e.target)) {
+            if (!sel.contains(e.target)) {
                 document.getElementById('hrTutorDropdown').classList.remove('open');
             }
         });
 
-        function toggleTutor(id, name) {
+        function toggleTutor(id) {
             if (hrSelectedTutors.has(id)) hrSelectedTutors.delete(id);
             else hrSelectedTutors.add(id);
             updateTutorLabel();
-            // Update checkbox visual
-            const cb = document.getElementById('hr-cb-' + id);
-            if (cb) cb.checked = hrSelectedTutors.has(id);
         }
 
         function updateTutorLabel() {
@@ -726,20 +547,20 @@
             const curFilt = filt.value;
 
             dd.innerHTML = `<label class="multi-select-item" onclick="selectAllTutors()">
-                <span style="font-weight:600;">Select All</span>
+                <span class="select-all-label">Select All</span>
             </label>`;
             tutors.forEach(u => {
                 dd.innerHTML += `<label class="multi-select-item">
-                    <input type="checkbox" id="hr-cb-${u.id}" value="${u.id}" ${hrSelectedTutors.has(u.id) ? 'checked' : ''} onchange="toggleTutor(${u.id}, '${escapeHtml(u.display_name)}')">
-                    <span>${escapeHtml(u.display_name)}</span>
+                    <input type="checkbox" value="${u.id}" ${hrSelectedTutors.has(u.id) ? 'checked' : ''} onchange="toggleTutor(${u.id})">
+                    <span>${u.display_name}</span>
                 </label>`;
             });
 
             filt.innerHTML = '<option value="">All Tutors</option>';
             tutors.forEach(u => {
-                filt.innerHTML += `<option value="${u.id}">${escapeHtml(u.display_name)}</option>`;
+                filt.innerHTML += `<option value="${u.id}">${u.display_name}</option>`;
             });
-            if (curFilt) filt.value = curFilt;
+            filt.value = curFilt;
         }
 
         async function loadHours() {
@@ -755,7 +576,6 @@
             const filtered = filter ? allHours.filter(h => String(h.user_id) === filter) : allHours;
             const container = document.getElementById('hoursList');
 
-            // Calculate total
             const totalHours = filtered.reduce((sum, h) => sum + h.hours, 0);
 
             if (filtered.length === 0) {
@@ -768,18 +588,18 @@
                 <span class="hours-total-value">${totalHours.toFixed(1)}</span>
             </div>`;
 
-            html += '<div class="users-table" style="margin-top:12px;"><div class="table-header table-hours">';
+            html += '<div class="users-table table-spaced"><div class="table-header table-hours">';
             html += '<span>Tutor</span><span>Date</span><span>Hours</span><span>Description</span><span></span>';
             html += '</div>';
 
             filtered.forEach(h => {
                 html += `<div class="table-row table-hours" id="hour-row-${h.id}">
-                    <span class="user-name">${escapeHtml(h.display_name)}</span>
+                    <span class="user-name">${h.display_name}</span>
                     <span>${formatDate(h.work_date)}</span>
                     <span>${h.hours}</span>
-                    <span class="text-muted">${escapeHtml(h.description || '—')}</span>
-                    <span style="display:flex;gap:4px;">
-                        <button class="btn btn-danger-ghost" style="border-color:var(--gray-300);color:var(--gray-600);" onclick="editHour(${h.id})">Edit</button>
+                    <span class="text-muted">${h.description || '—'}</span>
+                    <span class="inline-actions">
+                        <button class="btn btn-danger-ghost btn-secondary-ghost" onclick="editHour(${h.id})">Edit</button>
                         <button class="btn btn-danger-ghost" onclick="deleteHour(${h.id})">Delete</button>
                     </span>
                 </div>`;
@@ -808,36 +628,32 @@
                 }),
             });
             const data = await res.json();
-            showMsg(msgEl, res.ok, res.ok ? data.message : (data.error || 'Failed'));
+            showMsg(msgEl, res.ok, res.ok ? data.message : data.detail);
             if (res.ok) {
-                document.getElementById('hrDate').value = '';
-                document.getElementById('hrHours').value = '';
-                document.getElementById('hrDesc').value = '';
+                document.getElementById('logHoursForm').reset();
                 hrSelectedTutors.clear();
                 updateTutorLabel();
-                document.querySelectorAll('#hrTutorDropdown input[type=checkbox]').forEach(cb => cb.checked = false);
                 loadHours();
             }
         });
 
         function editHour(id) {
             const h = allHours.find(x => x.id === id);
-            if (!h) return;
             const row = document.getElementById('hour-row-' + id);
             row.innerHTML = `
-                <span class="user-name">${escapeHtml(h.display_name)}</span>
-                <span><input type="date" id="editDate-${id}" value="${h.work_date}" style="padding:4px 8px;border:1px solid var(--gray-300);border-radius:4px;font-family:inherit;font-size:13px;"></span>
-                <span><input type="number" id="editHours-${id}" value="${h.hours}" min="0.25" step="0.25" style="width:70px;padding:4px 8px;border:1px solid var(--gray-300);border-radius:4px;font-family:inherit;font-size:13px;"></span>
-                <span><input type="text" id="editDesc-${id}" value="${escapeHtml(h.description || '')}" style="width:100%;padding:4px 8px;border:1px solid var(--gray-300);border-radius:4px;font-family:inherit;font-size:13px;"></span>
-                <span style="display:flex;gap:4px;">
-                    <button class="btn btn-danger-ghost" style="border-color:var(--green-600);color:var(--green-700);" onclick="saveHour(${id})">Save</button>
-                    <button class="btn btn-danger-ghost" style="border-color:var(--gray-300);color:var(--gray-600);" onclick="renderHours()">Cancel</button>
+                <span class="user-name">${h.display_name}</span>
+                <span><input type="date" id="editDate-${id}" value="${h.work_date}" class="inline-edit-input"></span>
+                <span><input type="number" id="editHours-${id}" value="${h.hours}" min="0.25" step="0.25" class="inline-edit-input inline-edit-input-hours"></span>
+                <span><input type="text" id="editDesc-${id}" value="${h.description || ''}" class="inline-edit-input inline-edit-input-full"></span>
+                <span class="inline-actions">
+                    <button class="btn btn-danger-ghost btn-save-ghost" onclick="saveHour(${id})">Save</button>
+                    <button class="btn btn-danger-ghost btn-secondary-ghost" onclick="renderHours()">Cancel</button>
                 </span>
             `;
         }
 
         async function saveHour(id) {
-            const res = await fetch(`/api/admin/hours/${id}`, {
+            await fetch(`/api/admin/hours/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
                 body: JSON.stringify({
@@ -846,91 +662,16 @@
                     description: document.getElementById('editDesc-' + id).value,
                 }),
             });
-            if (res.ok) loadHours();
-            else alert('Failed to update');
+            loadHours();
         }
 
         async function deleteHour(id) {
-            if (!confirm('Delete this hour entry?')) return;
             await fetch(`/api/admin/hours/${id}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': 'Bearer ' + token },
             });
             loadHours();
         }
-
-        // ── Roles ──
-
-        async function loadRoles() {
-            await fetchRoles();
-            renderRoles();
-        }
-
-        function renderRoles() {
-            const container = document.getElementById('rolesList');
-            if (cachedRoles.length === 0) {
-                container.innerHTML = '<p class="text-muted">No roles defined yet.</p>';
-                return;
-            }
-            let html = '<h3>Role Hierarchy</h3><p class="text-muted" style="margin-bottom:12px;">Top = lowest rank. Use arrows to reorder.</p>';
-            html += '<div class="roles-list">';
-            cachedRoles.forEach((r, i) => {
-                html += `<div class="role-item">
-                    <div class="role-item-left">
-                        <span class="role-rank">${i + 1}</span>
-                        <span class="role-name">${escapeHtml(r.name)}</span>
-                    </div>
-                    <div class="role-item-right">
-                        <button class="btn-role-arrow" ${i === 0 ? 'disabled' : ''} onclick="moveRole(${i}, -1)" title="Move up">&#9650;</button>
-                        <button class="btn-role-arrow" ${i === cachedRoles.length - 1 ? 'disabled' : ''} onclick="moveRole(${i}, 1)" title="Move down">&#9660;</button>
-                        <button class="btn btn-danger-ghost" onclick="deleteRole(${r.id}, '${escapeHtml(r.name)}')">Delete</button>
-                    </div>
-                </div>`;
-            });
-            html += '</div>';
-            container.innerHTML = html;
-        }
-
-        async function moveRole(index, direction) {
-            const newIndex = index + direction;
-            if (newIndex < 0 || newIndex >= cachedRoles.length) return;
-            // Swap in local array
-            [cachedRoles[index], cachedRoles[newIndex]] = [cachedRoles[newIndex], cachedRoles[index]];
-            renderRoles();
-            // Persist new order
-            const res = await fetch('/api/admin/roles/reorder', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-                body: JSON.stringify({ role_ids: cachedRoles.map(r => r.id) }),
-            });
-            if (!res.ok) alert('Failed to save order');
-        }
-
-        async function deleteRole(id, name) {
-            if (!confirm(`Delete the "${name}" role? Users with this role will be reset to "Jr. Tutor".`)) return;
-            await fetch(`/api/admin/roles/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': 'Bearer ' + token },
-            });
-            await loadRoles();
-        }
-
-        document.getElementById('createRoleForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const msgEl = document.getElementById('roleMsg');
-            const name = document.getElementById('newRoleName').value.trim();
-            const res = await fetch('/api/admin/roles', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-                body: JSON.stringify({ name }),
-            });
-            const data = await res.json();
-            showMsg(msgEl, res.ok, res.ok ? 'Role created!' : (data.error || 'Failed'));
-            if (res.ok) {
-                document.getElementById('newRoleName').value = '';
-                await loadRoles();
-            }
-        });
 
         function logout() {
             localStorage.removeItem('bs_token');
