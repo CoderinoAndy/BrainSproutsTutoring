@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -27,7 +27,6 @@
         <div id="tab-schedule" class="tab-content">
             <div class="page-header">
                 <h2>Session Overview</h2>
-                <p class="text-muted">View tutor attendance for all scheduled events.</p>
             </div>
             <div id="adminEvents"></div>
         </div>
@@ -35,7 +34,6 @@
         <div id="tab-events" class="tab-content is-hidden">
             <div class="page-header">
                 <h2>Manage Events</h2>
-                <p class="text-muted">Add, edit, or remove events.</p>
             </div>
 
             <div class="create-user-card">
@@ -76,7 +74,6 @@
         <div id="tab-users" class="tab-content is-hidden">
             <div class="page-header">
                 <h2>Manage Tutors</h2>
-                <p class="text-muted">"The most valuable asset are humans!" - Andy</p>
             </div>
 
             <div class="create-user-card">
@@ -105,7 +102,6 @@
         <div id="tab-announcements" class="tab-content is-hidden">
             <div class="page-header">
                 <h2>Announcements</h2>
-                <p class="text-muted">Better hope they read them haha</p>
             </div>
 
             <div class="create-user-card">
@@ -121,7 +117,6 @@
                     </div>
                     <button type="submit" class="btn btn-primary btn-auto-width">Post Announcement</button>
                 </form>
-                <div id="annMsg" class="msg is-hidden"></div>
             </div>
 
             <div id="annList"></div>
@@ -130,7 +125,6 @@
         <div id="tab-hours" class="tab-content is-hidden">
             <div class="page-header">
                 <h2>Hour Tracker</h2>
-                <p class="text-muted">Log and manage tutor hours.</p>
             </div>
 
             <div class="create-user-card">
@@ -196,12 +190,6 @@
                 hour: 'numeric',
                 minute: '2-digit',
             });
-        }
-
-        function showMsg(el, ok, text) {
-            el.className = ok ? 'msg msg-success' : 'msg msg-error';
-            el.textContent = text;
-            setTimeout(() => el.classList.add('is-hidden'), 3000);
         }
 
         function switchTab(tab) {
@@ -339,9 +327,14 @@
                     max_capacity: parseInt(document.getElementById('evCapacity').value),
                 }),
             });
-            const data = await res.json();
-            showMsg(msgEl, res.ok, res.ok ? data.message : data.detail);
-            if (res.ok) { document.getElementById('evDate').value = ''; loadEventList(); }
+            if (!res.ok) {
+                msgEl.className = 'msg msg-error';
+                msgEl.textContent = (await res.json()).detail;
+                return;
+            }
+            msgEl.classList.add('is-hidden');
+            document.getElementById('evDate').value = '';
+            loadEventList();
         });
 
         function editEvent(id) {
@@ -402,7 +395,7 @@
                     <span class="user-name">${u.display_name} ${u.is_admin ? '<span class="nav-badge">Admin</span>' : ''}</span>
                     <span class="text-muted">${u.username}</span>
                     <span>${titleSelect}</span>
-                    <span class="text-muted">${u.created_at ? u.created_at.split('T')[0] : ''}</span>
+                    <span class="text-muted">${u.created_at.split(' ')[0]}</span>
                     <span>${!u.is_admin ? `<button class="btn btn-danger-ghost" onclick="deleteUser(${u.id})">Remove</button>` : ''}</span>
                 </div>`;
             });
@@ -430,9 +423,14 @@
                     password: document.getElementById('newPassword').value,
                 }),
             });
-            const data = await res.json();
-            showMsg(msgEl, res.ok, res.ok ? 'Account created successfully!' : data.detail);
-            if (res.ok) { document.getElementById('createUserForm').reset(); loadUsers(); }
+            if (!res.ok) {
+                msgEl.className = 'msg msg-error';
+                msgEl.textContent = (await res.json()).detail;
+                return;
+            }
+            msgEl.classList.add('is-hidden');
+            document.getElementById('createUserForm').reset();
+            loadUsers();
         });
 
         async function deleteUser(id) {
@@ -473,8 +471,7 @@
 
         document.getElementById('createAnnForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const msgEl = document.getElementById('annMsg');
-            const res = await fetch('/api/admin/announcements', {
+            await fetch('/api/admin/announcements', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
                 body: JSON.stringify({
@@ -482,9 +479,8 @@
                     body: document.getElementById('annBody').value,
                 }),
             });
-            const data = await res.json();
-            showMsg(msgEl, res.ok, res.ok ? 'Announcement posted!' : data.detail);
-            if (res.ok) { document.getElementById('createAnnForm').reset(); loadAnnouncements(); }
+            document.getElementById('createAnnForm').reset();
+            loadAnnouncements();
         });
 
         async function deleteAnnouncement(id) {
@@ -614,10 +610,12 @@
             e.preventDefault();
             const msgEl = document.getElementById('hrMsg');
             if (hrSelectedTutors.size === 0) {
-                showMsg(msgEl, false, 'Please select at least one tutor');
+                msgEl.className = 'msg msg-error';
+                msgEl.textContent = 'Please select at least one tutor';
                 return;
             }
-            const res = await fetch('/api/admin/hours', {
+            msgEl.classList.add('is-hidden');
+            await fetch('/api/admin/hours', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
                 body: JSON.stringify({
@@ -627,14 +625,10 @@
                     description: document.getElementById('hrDesc').value,
                 }),
             });
-            const data = await res.json();
-            showMsg(msgEl, res.ok, res.ok ? data.message : data.detail);
-            if (res.ok) {
-                document.getElementById('logHoursForm').reset();
-                hrSelectedTutors.clear();
-                updateTutorLabel();
-                loadHours();
-            }
+            document.getElementById('logHoursForm').reset();
+            hrSelectedTutors.clear();
+            updateTutorLabel();
+            loadHours();
         });
 
         function editHour(id) {

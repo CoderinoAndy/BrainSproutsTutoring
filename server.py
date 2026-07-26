@@ -10,7 +10,7 @@ import jwt
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "brainsprouts.db"
@@ -104,10 +104,13 @@ class TitleBody(BaseModel):
 
 class EventBody(BaseModel):
     title: str
-    event_date: str = ""
     start_time: str
     end_time: str
     max_capacity: int = 15
+
+
+class CreateEventBody(EventBody):
+    event_date: str
 
 
 class AnnouncementBody(BaseModel):
@@ -121,10 +124,13 @@ class RsvpBody(BaseModel):
 
 
 class HoursBody(BaseModel):
-    user_ids: list[int] = Field(default_factory=list)
     work_date: str
     hours: float
     description: str = ""
+
+
+class LogHoursBody(HoursBody):
+    user_ids: list[int]
 
 
 app = FastAPI()
@@ -183,7 +189,7 @@ def list_users(db: Db, _admin: Admin):
     return db.execute("SELECT id, username, display_name, is_admin, executive_title, created_at FROM users ORDER BY display_name").fetchall()
 
 
-@app.post("/api/admin/users", status_code=201)
+@app.post("/api/admin/users")
 def create_user(data: UserBody, db: Db, _admin: Admin):
     username, display_name = data.username.strip(), data.display_name.strip()
     if db.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone():
@@ -192,23 +198,20 @@ def create_user(data: UserBody, db: Db, _admin: Admin):
     db.execute("INSERT INTO users (username, password_hash, display_name) VALUES (?, ?, ?)",
                (username, password_hash, display_name))
     db.commit()
-    return {"message": "User created successfully"}
 
 
 @app.delete("/api/admin/users/{user_id}")
 def delete_user(user_id: int, db: Db, _admin: Admin):
     db.execute("DELETE FROM rsvps WHERE user_id = ?", (user_id,))
     db.execute("DELETE FROM hours WHERE user_id = ?", (user_id,))
-    db.execute("DELETE FROM users WHERE id = ? AND is_admin = 0", (user_id,))
+    db.execute("DELETE FROM users WHERE id = ?", (user_id,))
     db.commit()
-    return {"message": "User deleted"}
 
 
 @app.put("/api/admin/users/{user_id}/title")
 def update_title(user_id: int, data: TitleBody, db: Db, _admin: Admin):
     db.execute("UPDATE users SET executive_title = ? WHERE id = ?", (data.executive_title.strip(), user_id))
     db.commit()
-    return {"message": "Title updated"}
 
 
 @app.get("/api/admin/events")
@@ -226,15 +229,14 @@ def admin_events(db: Db, _admin: Admin):
     return result
 
 
-@app.post("/api/admin/events", status_code=201)
-def create_event(data: EventBody, db: Db, _admin: Admin):
+@app.post("/api/admin/events")
+def create_event(data: CreateEventBody, db: Db, _admin: Admin):
     values = (data.title.strip(), data.event_date.strip(), data.start_time.strip(), data.end_time.strip())
     if db.execute("SELECT id FROM events WHERE event_date = ?", (values[1],)).fetchone():
         raise HTTPException(409, "An event already exists on this date")
     db.execute("INSERT INTO events (title, event_date, start_time, end_time, max_capacity) VALUES (?, ?, ?, ?, ?)",
                (*values, data.max_capacity))
     db.commit()
-    return {"message": "Event created"}
 
 
 @app.put("/api/admin/events/{event_id}")
@@ -243,7 +245,6 @@ def update_event(event_id: int, data: EventBody, db: Db, _admin: Admin):
     db.execute("UPDATE events SET title = ?, start_time = ?, end_time = ?, max_capacity = ? WHERE id = ?",
                (*values, data.max_capacity, event_id))
     db.commit()
-    return {"message": "Event updated"}
 
 
 @app.delete("/api/admin/events/{event_id}")
@@ -252,7 +253,6 @@ def delete_event(event_id: int, db: Db, _admin: Admin):
     db.execute("DELETE FROM rsvps WHERE event_date = ?", (event["event_date"],))
     db.execute("DELETE FROM events WHERE id = ?", (event_id,))
     db.commit()
-    return {"message": "Event deleted"}
 
 
 @app.get("/api/announcements")
@@ -260,18 +260,16 @@ def announcements(db: Db, _user: User):
     return db.execute("SELECT * FROM announcements ORDER BY created_at DESC").fetchall()
 
 
-@app.post("/api/admin/announcements", status_code=201)
+@app.post("/api/admin/announcements")
 def create_announcement(data: AnnouncementBody, db: Db, _admin: Admin):
     db.execute("INSERT INTO announcements (title, body) VALUES (?, ?)", (data.title.strip(), data.body.strip()))
     db.commit()
-    return {"message": "Announcement posted"}
 
 
 @app.delete("/api/admin/announcements/{announcement_id}")
 def delete_announcement(announcement_id: int, db: Db, _admin: Admin):
     db.execute("DELETE FROM announcements WHERE id = ?", (announcement_id,))
     db.commit()
-    return {"message": "Announcement deleted"}
 
 
 @app.get("/api/events")
@@ -300,7 +298,6 @@ def rsvp(data: RsvpBody, db: Db, user: User):
         ON CONFLICT(user_id, event_date) DO UPDATE SET status = ?, updated_at = datetime('now')""",
         (user["user_id"], data.date, data.status, data.status))
     db.commit()
-    return {"message": "RSVP updated"}
 
 
 @app.get("/api/me")
@@ -323,13 +320,11 @@ def all_hours(db: Db, _admin: Admin):
         FROM hours h JOIN users u ON h.user_id = u.id ORDER BY h.work_date DESC, u.display_name""").fetchall()
 
 
-@app.post("/api/admin/hours", status_code=201)
-def create_hours(data: HoursBody, db: Db, _admin: Admin):
+@app.post("/api/admin/hours")
+def create_hours(data: LogHoursBody, db: Db, _admin: Admin):
     db.executemany("INSERT INTO hours (user_id, work_date, hours, description) VALUES (?, ?, ?, ?)",
         [(user_id, data.work_date, data.hours, data.description.strip()) for user_id in data.user_ids])
     db.commit()
-    count = len(data.user_ids)
-    return {"message": f"Hours logged for {count} tutor{'s' if count != 1 else ''}"}
 
 
 @app.put("/api/admin/hours/{hour_id}")
@@ -337,14 +332,12 @@ def update_hours(hour_id: int, data: HoursBody, db: Db, _admin: Admin):
     db.execute("UPDATE hours SET work_date = ?, hours = ?, description = ? WHERE id = ?",
                (data.work_date, data.hours, data.description.strip(), hour_id))
     db.commit()
-    return {"message": "Hours updated"}
 
 
 @app.delete("/api/admin/hours/{hour_id}")
 def delete_hours(hour_id: int, db: Db, _admin: Admin):
     db.execute("DELETE FROM hours WHERE id = ?", (hour_id,))
     db.commit()
-    return {"message": "Hours deleted"}
 
 
 init_db()
