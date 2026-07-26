@@ -493,6 +493,7 @@ body {
 }
 
 .msg-error { background: var(--red-100); color: var(--red-700); }
+.msg-success { background: var(--green-100); color: var(--green-700); }
 
 .users-list h3 {
     font-size: 15px;
@@ -691,6 +692,90 @@ body {
 
 .table-events {
     grid-template-columns: 1.2fr 1fr 1fr 0.5fr 140px;
+}
+
+.roles-help {
+    margin-bottom: 12px;
+}
+
+.roles-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.role-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    padding: 12px 20px;
+    transition: box-shadow 0.15s;
+}
+
+.role-item:hover {
+    box-shadow: var(--shadow-md);
+}
+
+.role-item-left,
+.role-item-right {
+    display: flex;
+    align-items: center;
+}
+
+.role-item-left {
+    gap: 12px;
+}
+
+.role-item-right {
+    gap: 6px;
+}
+
+.role-rank {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    background: var(--green-100);
+    color: var(--green-700);
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 100px;
+}
+
+.role-name {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.btn-role-arrow {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-sm);
+    background: white;
+    font-size: 12px;
+    color: var(--gray-600);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.btn-role-arrow:hover:not(:disabled) {
+    border-color: var(--green-400);
+    color: var(--green-700);
+    background: var(--green-50);
+}
+
+.btn-role-arrow:disabled,
+.btn-danger-ghost:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
 }
 
 .nav-hours-badge {

@@ -7,3 +7,5 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.11.11"
+      - key: SECRET_KEY
+        generateValue: true

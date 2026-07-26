@@ -19,6 +19,7 @@
             <button class="btn btn-ghost tab-btn" data-tab="announcements" onclick="switchTab('announcements')">Announcements</button>
             <button class="btn btn-ghost tab-btn" data-tab="users" onclick="switchTab('users')">Manage Tutors</button>
             <button class="btn btn-ghost tab-btn" data-tab="hours" onclick="switchTab('hours')">Hours</button>
+            <button class="btn btn-ghost tab-btn" data-tab="roles" onclick="switchTab('roles')">Roles</button>
             <button class="btn btn-ghost" onclick="logout()">Sign Out</button>
         </div>
     </nav>
@@ -168,6 +169,27 @@
             <div id="hoursList"></div>
         </div>
 
+        <div id="tab-roles" class="tab-content is-hidden">
+            <div class="page-header">
+                <h2>Manage Roles</h2>
+                <p class="text-muted">Create roles and arrange them from lowest to highest rank.</p>
+            </div>
+
+            <div class="create-user-card">
+                <h3>Create New Role</h3>
+                <form id="createRoleForm" class="form-row">
+                    <div class="form-group">
+                        <label for="newRoleName">Role Name</label>
+                        <input type="text" id="newRoleName" required placeholder="e.g. Program Coordinator">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-create">Add Role</button>
+                </form>
+                <div id="roleMsg" class="msg is-hidden"></div>
+            </div>
+
+            <div id="rolesList"></div>
+        </div>
+
     </main>
 
     <script>
@@ -175,7 +197,7 @@
         const user = JSON.parse(localStorage.getItem('bs_user'));
         if (!token || !user || !user.is_admin) { window.location.href = '/'; }
 
-        const titles = ['Jr. Tutor', 'Reserve Tutor', 'Tutor', 'Sr. Tutor', 'Lead Tutor', 'Executive Tutor'];
+        let cachedRoles = [];
 
         function formatDate(dateStr) {
             return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', {
@@ -192,6 +214,18 @@
             });
         }
 
+        function escapeHtml(value) {
+            const div = document.createElement('div');
+            div.textContent = value ?? '';
+            return div.innerHTML;
+        }
+
+        function showMsg(element, ok, text) {
+            element.className = ok ? 'msg msg-success' : 'msg msg-error';
+            element.textContent = text;
+            setTimeout(() => element.classList.add('is-hidden'), 3000);
+        }
+
         function switchTab(tab) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('is-hidden'));
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -202,6 +236,7 @@
             if (tab === 'users') loadUsers();
             if (tab === 'announcements') loadAnnouncements();
             if (tab === 'hours') { loadHoursTutorDropdowns(); loadHours(); }
+            if (tab === 'roles') loadRoles();
         }
 
         async function loadAdminEvents() {
@@ -377,10 +412,22 @@
             loadEventList();
         }
 
-        async function loadUsers() {
-            const usersRes = await fetch('/api/admin/users', {
+        async function fetchRoles() {
+            const res = await fetch('/api/roles', {
                 headers: { 'Authorization': 'Bearer ' + token },
             });
+            if (res.status === 401 || res.status === 403) { logout(); return []; }
+            cachedRoles = await res.json();
+            return cachedRoles;
+        }
+
+        async function loadUsers() {
+            const [usersRes] = await Promise.all([
+                fetch('/api/admin/users', {
+                    headers: { 'Authorization': 'Bearer ' + token },
+                }),
+                fetchRoles(),
+            ]);
             const users = await usersRes.json();
             const list = document.getElementById('usersList');
             let html = '<h3>Current Tutors</h3><div class="users-table">';
@@ -388,14 +435,17 @@
                 <span>Name</span><span>Username</span><span>Executive Title</span><span>Created</span><span></span>
             </div>`;
             users.forEach(u => {
+                const availableRoles = cachedRoles.some(role => role.name === u.executive_title)
+                    ? cachedRoles
+                    : [{ id: null, name: u.executive_title || 'Jr. Tutor' }, ...cachedRoles];
                 const titleSelect = !u.is_admin ? `<select class="select-input select-input-compact" onchange="updateTitle(${u.id}, this.value)">
-                    ${titles.map(title => `<option value="${title}" ${u.executive_title === title ? 'selected' : ''}>${title}</option>`).join('')}
+                    ${availableRoles.map(role => `<option value="${escapeHtml(role.name)}" ${u.executive_title === role.name ? 'selected' : ''}>${escapeHtml(role.name)}</option>`).join('')}
                     </select>` : '';
                 html += `<div class="table-row table-5col">
-                    <span class="user-name">${u.display_name} ${u.is_admin ? '<span class="nav-badge">Admin</span>' : ''}</span>
-                    <span class="text-muted">${u.username}</span>
+                    <span class="user-name">${escapeHtml(u.display_name)} ${u.is_admin ? '<span class="nav-badge">Admin</span>' : ''}</span>
+                    <span class="text-muted">${escapeHtml(u.username)}</span>
                     <span>${titleSelect}</span>
-                    <span class="text-muted">${u.created_at.split(' ')[0]}</span>
+                    <span class="text-muted">${String(u.created_at).split(/[ T]/)[0]}</span>
                     <span>${!u.is_admin ? `<button class="btn btn-danger-ghost" onclick="deleteUser(${u.id})">Remove</button>` : ''}</span>
                 </div>`;
             });
@@ -666,6 +716,80 @@
             });
             loadHours();
         }
+
+        async function loadRoles() {
+            await fetchRoles();
+            const container = document.getElementById('rolesList');
+            if (cachedRoles.length === 0) {
+                container.innerHTML = '<p class="text-muted">No roles defined yet.</p>';
+                return;
+            }
+            let html = '<h3>Role Hierarchy</h3><p class="text-muted roles-help">Top = lowest rank. Use arrows to reorder.</p>';
+            html += '<div class="roles-list">';
+            cachedRoles.forEach((role, index) => {
+                const isDefault = role.name === 'Jr. Tutor';
+                html += `<div class="role-item">
+                    <div class="role-item-left">
+                        <span class="role-rank">${index + 1}</span>
+                        <span class="role-name">${escapeHtml(role.name)}</span>
+                    </div>
+                    <div class="role-item-right">
+                        <button class="btn-role-arrow" ${index === 0 ? 'disabled' : ''} onclick="moveRole(${index}, -1)" title="Move up">&#9650;</button>
+                        <button class="btn-role-arrow" ${index === cachedRoles.length - 1 ? 'disabled' : ''} onclick="moveRole(${index}, 1)" title="Move down">&#9660;</button>
+                        <button class="btn btn-danger-ghost" ${isDefault ? 'disabled title="Default role cannot be deleted"' : `onclick="deleteRole(${role.id})"`}>Delete</button>
+                    </div>
+                </div>`;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        async function moveRole(index, direction) {
+            const newIndex = index + direction;
+            if (newIndex < 0 || newIndex >= cachedRoles.length) return;
+            [cachedRoles[index], cachedRoles[newIndex]] = [cachedRoles[newIndex], cachedRoles[index]];
+            const res = await fetch('/api/admin/roles/reorder', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({ role_ids: cachedRoles.map(role => role.id) }),
+            });
+            if (!res.ok) {
+                await loadRoles();
+                alert((await res.json()).detail || 'Failed to save role order');
+                return;
+            }
+            await loadRoles();
+        }
+
+        async function deleteRole(id) {
+            const role = cachedRoles.find(item => item.id === id);
+            if (!role || !confirm(`Delete the "${role.name}" role? Tutors with this role will be reset to "Jr. Tutor".`)) return;
+            const res = await fetch(`/api/admin/roles/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': 'Bearer ' + token },
+            });
+            if (!res.ok) {
+                alert((await res.json()).detail || 'Failed to delete role');
+                return;
+            }
+            await loadRoles();
+        }
+
+        document.getElementById('createRoleForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const msgEl = document.getElementById('roleMsg');
+            const res = await fetch('/api/admin/roles', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({ name: document.getElementById('newRoleName').value }),
+            });
+            const data = await res.json().catch(() => ({}));
+            showMsg(msgEl, res.ok, res.ok ? 'Role created!' : (data.detail || 'Failed to create role'));
+            if (res.ok) {
+                document.getElementById('newRoleName').value = '';
+                await loadRoles();
+            }
+        });
 
         function logout() {
             localStorage.removeItem('bs_token');

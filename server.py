@@ -14,16 +14,79 @@ from pydantic import BaseModel
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "brainsprouts.db"
+DATABASE_URL = os.getenv("DATABASE_URL")
+USE_POSTGRES = bool(DATABASE_URL)
 SECRET_KEY = os.getenv("SECRET_KEY", secrets.token_hex(32))
+
+if os.getenv("RENDER") == "true" and not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL is required on Render. Connect the existing Render "
+        "PostgreSQL database instead of using ephemeral SQLite storage."
+    )
+
+if USE_POSTGRES:
+    import psycopg2
+    import psycopg2.extras
+
+
+DEFAULT_ROLES = [
+    "Jr. Tutor",
+    "Reserve Tutor",
+    "Tutor",
+    "Sr. Tutor",
+    "Lead Tutor",
+    "Executive Tutor",
+    "Marketing Director",
+    "Hartman Lead",
+    "CICS Lead",
+]
 
 
 def dict_factory(cursor, row):
     return {column[0]: row[index] for index, column in enumerate(cursor.description)}
 
 
+def postgres_sql(sql: str) -> str:
+    """Translate the small SQLite-compatible query subset used by this app."""
+    return sql.replace("datetime('now')", "NOW()").replace("?", "%s")
+
+
+class Database:
+    """Expose one query interface for local SQLite and Render PostgreSQL."""
+
+    def __init__(self):
+        if USE_POSTGRES:
+            self.connection = psycopg2.connect(DATABASE_URL)
+        else:
+            self.connection = sqlite3.connect(DB_PATH)
+            self.connection.row_factory = dict_factory
+
+    def execute(self, sql, params=()):
+        if USE_POSTGRES:
+            cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor.execute(postgres_sql(sql), params)
+            return cursor
+        return self.connection.execute(sql, params)
+
+    def executemany(self, sql, params):
+        if USE_POSTGRES:
+            cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor.executemany(postgres_sql(sql), params)
+            return cursor
+        return self.connection.executemany(sql, params)
+
+    def commit(self):
+        self.connection.commit()
+
+    def rollback(self):
+        self.connection.rollback()
+
+    def close(self):
+        self.connection.close()
+
+
 def get_db():
-    db = sqlite3.connect(DB_PATH)
-    db.row_factory = dict_factory
+    db = Database()
     try:
         yield db
     finally:
@@ -31,62 +94,174 @@ def get_db():
 
 
 def init_db():
-    db = sqlite3.connect(DB_PATH)
-    db.row_factory = dict_factory
-    db.executescript("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            display_name TEXT NOT NULL,
-            is_admin INTEGER DEFAULT 0,
-            executive_title TEXT NOT NULL DEFAULT 'Jr. Tutor',
-            created_at TEXT DEFAULT (datetime('now'))
-        );
-        CREATE TABLE IF NOT EXISTS events (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            event_date TEXT NOT NULL,
-            start_time TEXT NOT NULL,
-            end_time TEXT NOT NULL,
-            max_capacity INTEGER NOT NULL DEFAULT 15,
-            created_at TEXT DEFAULT (datetime('now'))
-        );
-        CREATE TABLE IF NOT EXISTS rsvps (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL REFERENCES users(id),
-            event_date TEXT NOT NULL,
-            status TEXT NOT NULL CHECK(status IN ('yes','maybe','no')),
-            updated_at TEXT DEFAULT (datetime('now')),
-            UNIQUE(user_id, event_date)
-        );
-        CREATE TABLE IF NOT EXISTS announcements (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            body TEXT NOT NULL,
-            created_at TEXT DEFAULT (datetime('now'))
-        );
-        CREATE TABLE IF NOT EXISTS hours (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL REFERENCES users(id),
-            work_date TEXT NOT NULL,
-            hours REAL NOT NULL,
-            description TEXT NOT NULL DEFAULT '',
-            created_at TEXT DEFAULT (datetime('now'))
-        );
-    """)
-    if not db.execute("SELECT id FROM users WHERE username = ?", ("AndyAlbert",)).fetchone():
-        password_hash = bcrypt.hashpw(b"BrainSprouts2000", bcrypt.gensalt()).decode()
-        db.execute("INSERT INTO users (username, password_hash, display_name, is_admin) VALUES (?, ?, ?, 1)",
-                   ("AndyAlbert", password_hash, "Andy Albert"))
-    if db.execute("SELECT COUNT(*) AS count FROM events").fetchone()["count"] == 0:
-        day = datetime(2026, 3, 25)
-        while day <= datetime(2026, 6, 30):
-            db.execute("INSERT INTO events (title, event_date, start_time, end_time, max_capacity) VALUES (?, ?, ?, ?, ?)",
-                       ("Tutoring Session", day.strftime("%Y-%m-%d"), "16:00", "17:00", 15))
-            day += timedelta(days=7)
-    db.commit()
-    db.close()
+    db = Database()
+    try:
+        if USE_POSTGRES:
+            statements = [
+                """
+                CREATE TABLE IF NOT EXISTS users (
+                    id SERIAL PRIMARY KEY,
+                    username TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    display_name TEXT NOT NULL,
+                    is_admin BOOLEAN DEFAULT FALSE,
+                    executive_title TEXT NOT NULL DEFAULT 'Jr. Tutor',
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+                """,
+                """
+                CREATE TABLE IF NOT EXISTS events (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    event_date TEXT NOT NULL,
+                    start_time TEXT NOT NULL,
+                    end_time TEXT NOT NULL,
+                    max_capacity INTEGER NOT NULL DEFAULT 15,
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+                """,
+                """
+                CREATE TABLE IF NOT EXISTS rsvps (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id),
+                    event_date TEXT NOT NULL,
+                    status TEXT NOT NULL CHECK(status IN ('yes','maybe','no')),
+                    updated_at TIMESTAMP DEFAULT NOW(),
+                    UNIQUE(user_id, event_date)
+                )
+                """,
+                """
+                CREATE TABLE IF NOT EXISTS announcements (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    body TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+                """,
+                """
+                CREATE TABLE IF NOT EXISTS hours (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id),
+                    work_date TEXT NOT NULL,
+                    hours REAL NOT NULL,
+                    description TEXT NOT NULL DEFAULT '',
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+                """,
+                """
+                CREATE TABLE IF NOT EXISTS roles (
+                    id SERIAL PRIMARY KEY,
+                    name TEXT UNIQUE NOT NULL,
+                    rank INTEGER NOT NULL DEFAULT 0
+                )
+                """,
+            ]
+            for statement in statements:
+                db.execute(statement)
+            db.execute(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS executive_title "
+                "TEXT NOT NULL DEFAULT 'Jr. Tutor'"
+            )
+        else:
+            db.connection.executescript("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    display_name TEXT NOT NULL,
+                    is_admin INTEGER DEFAULT 0,
+                    executive_title TEXT NOT NULL DEFAULT 'Jr. Tutor',
+                    created_at TEXT DEFAULT (datetime('now'))
+                );
+                CREATE TABLE IF NOT EXISTS events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    event_date TEXT NOT NULL,
+                    start_time TEXT NOT NULL,
+                    end_time TEXT NOT NULL,
+                    max_capacity INTEGER NOT NULL DEFAULT 15,
+                    created_at TEXT DEFAULT (datetime('now'))
+                );
+                CREATE TABLE IF NOT EXISTS rsvps (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL REFERENCES users(id),
+                    event_date TEXT NOT NULL,
+                    status TEXT NOT NULL CHECK(status IN ('yes','maybe','no')),
+                    updated_at TEXT DEFAULT (datetime('now')),
+                    UNIQUE(user_id, event_date)
+                );
+                CREATE TABLE IF NOT EXISTS announcements (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    body TEXT NOT NULL,
+                    created_at TEXT DEFAULT (datetime('now'))
+                );
+                CREATE TABLE IF NOT EXISTS hours (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL REFERENCES users(id),
+                    work_date TEXT NOT NULL,
+                    hours REAL NOT NULL,
+                    description TEXT NOT NULL DEFAULT '',
+                    created_at TEXT DEFAULT (datetime('now'))
+                );
+                CREATE TABLE IF NOT EXISTS roles (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT UNIQUE NOT NULL,
+                    rank INTEGER NOT NULL DEFAULT 0
+                );
+            """)
+            user_columns = {
+                row["name"] for row in db.execute("PRAGMA table_info(users)").fetchall()
+            }
+            if "executive_title" not in user_columns:
+                db.execute(
+                    "ALTER TABLE users ADD COLUMN executive_title "
+                    "TEXT NOT NULL DEFAULT 'Jr. Tutor'"
+                )
+
+        if not db.execute(
+            "SELECT id FROM users WHERE username = ?", ("AndyAlbert",)
+        ).fetchone():
+            password_hash = bcrypt.hashpw(
+                b"BrainSprouts2000", bcrypt.gensalt()
+            ).decode()
+            db.execute(
+                "INSERT INTO users "
+                "(username, password_hash, display_name, is_admin) "
+                "VALUES (?, ?, ?, ?)",
+                ("AndyAlbert", password_hash, "Andy Albert", True),
+            )
+
+        if db.execute("SELECT COUNT(*) AS count FROM events").fetchone()["count"] == 0:
+            day = datetime(2026, 3, 25)
+            while day <= datetime(2026, 6, 30):
+                db.execute(
+                    "INSERT INTO events "
+                    "(title, event_date, start_time, end_time, max_capacity) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    (
+                        "Tutoring Session",
+                        day.strftime("%Y-%m-%d"),
+                        "16:00",
+                        "17:00",
+                        15,
+                    ),
+                )
+                day += timedelta(days=7)
+
+        if db.execute("SELECT COUNT(*) AS count FROM roles").fetchone()["count"] == 0:
+            db.executemany(
+                "INSERT INTO roles (name, rank) VALUES (?, ?)",
+                [(name, rank) for rank, name in enumerate(DEFAULT_ROLES)],
+            )
+
+        db.commit()
+        print(f"Database ready: {'PostgreSQL' if USE_POSTGRES else 'SQLite'}")
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
 
 
 class LoginBody(BaseModel):
@@ -100,6 +275,14 @@ class UserBody(LoginBody):
 
 class TitleBody(BaseModel):
     executive_title: str
+
+
+class RoleBody(BaseModel):
+    name: str
+
+
+class RoleOrderBody(BaseModel):
+    role_ids: list[int]
 
 
 class EventBody(BaseModel):
@@ -152,7 +335,7 @@ def current_admin(user: Annotated[dict, Depends(current_user)]):
     return user
 
 
-Db = Annotated[sqlite3.Connection, Depends(get_db)]
+Db = Annotated[Database, Depends(get_db)]
 User = Annotated[dict, Depends(current_user)]
 Admin = Annotated[dict, Depends(current_admin)]
 
@@ -210,7 +393,73 @@ def delete_user(user_id: int, db: Db, _admin: Admin):
 
 @app.put("/api/admin/users/{user_id}/title")
 def update_title(user_id: int, data: TitleBody, db: Db, _admin: Admin):
-    db.execute("UPDATE users SET executive_title = ? WHERE id = ?", (data.executive_title.strip(), user_id))
+    title = data.executive_title.strip()
+    if not db.execute("SELECT id FROM roles WHERE name = ?", (title,)).fetchone():
+        raise HTTPException(400, "Unknown role")
+    db.execute(
+        "UPDATE users SET executive_title = ? WHERE id = ?", (title, user_id)
+    )
+    db.commit()
+
+
+@app.get("/api/roles")
+def list_roles(db: Db, _user: User):
+    return db.execute(
+        "SELECT id, name, rank FROM roles ORDER BY rank, id"
+    ).fetchall()
+
+
+@app.post("/api/admin/roles", status_code=201)
+def create_role(data: RoleBody, db: Db, _admin: Admin):
+    name = data.name.strip()
+    if not name:
+        raise HTTPException(400, "Role name is required")
+    next_rank = db.execute(
+        "SELECT COALESCE(MAX(rank), -1) + 1 AS next_rank FROM roles"
+    ).fetchone()["next_rank"]
+    try:
+        db.execute(
+            "INSERT INTO roles (name, rank) VALUES (?, ?)", (name, next_rank)
+        )
+        db.commit()
+    except Exception as error:
+        db.rollback()
+        raise HTTPException(409, "Role already exists") from error
+
+
+@app.delete("/api/admin/roles/{role_id}")
+def delete_role(role_id: int, db: Db, _admin: Admin):
+    role = db.execute(
+        "SELECT id, name FROM roles WHERE id = ?", (role_id,)
+    ).fetchone()
+    if not role:
+        raise HTTPException(404, "Role not found")
+    if role["name"] == DEFAULT_ROLES[0]:
+        raise HTTPException(400, "The default Jr. Tutor role cannot be deleted")
+    db.execute(
+        "UPDATE users SET executive_title = ? WHERE executive_title = ?",
+        (DEFAULT_ROLES[0], role["name"]),
+    )
+    db.execute("DELETE FROM roles WHERE id = ?", (role_id,))
+    db.commit()
+
+
+@app.put("/api/admin/roles/reorder")
+def reorder_roles(data: RoleOrderBody, db: Db, _admin: Admin):
+    existing_ids = {
+        row["id"] for row in db.execute("SELECT id FROM roles").fetchall()
+    }
+    requested_ids = data.role_ids
+    if (
+        not requested_ids
+        or len(requested_ids) != len(set(requested_ids))
+        or set(requested_ids) != existing_ids
+    ):
+        raise HTTPException(400, "role_ids must contain every role exactly once")
+    db.executemany(
+        "UPDATE roles SET rank = ? WHERE id = ?",
+        [(rank, role_id) for rank, role_id in enumerate(requested_ids)],
+    )
     db.commit()
 
 
