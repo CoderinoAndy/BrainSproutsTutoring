@@ -38,7 +38,6 @@
             </div>
 
             <div class="create-user-card">
-                <h3>Add Single Event</h3>
                 <form id="createEventForm">
                     <div class="form-row">
                         <div class="form-group">
@@ -78,7 +77,6 @@
             </div>
 
             <div class="create-user-card">
-                <h3>New Tutor Creation</h3>
                 <form id="createUserForm" class="form-row">
                     <div class="form-group">
                         <label for="newDisplay">Display Name</label>
@@ -172,11 +170,9 @@
         <div id="tab-roles" class="tab-content is-hidden">
             <div class="page-header">
                 <h2>Manage Roles</h2>
-                <p class="text-muted">Create roles and arrange them from lowest to highest rank.</p>
             </div>
 
             <div class="create-user-card">
-                <h3>Create New Role</h3>
                 <form id="createRoleForm" class="form-row">
                     <div class="form-group">
                         <label for="newRoleName">Role Name</label>
@@ -724,41 +720,16 @@
                 container.innerHTML = '<p class="text-muted">No roles defined yet.</p>';
                 return;
             }
-            let html = '<h3>Role Hierarchy</h3><p class="text-muted roles-help">Top = lowest rank. Use arrows to reorder.</p>';
-            html += '<div class="roles-list">';
-            cachedRoles.forEach((role, index) => {
+            let html = '<div class="roles-list">';
+            cachedRoles.forEach((role) => {
                 const isDefault = role.name === 'Jr. Tutor';
                 html += `<div class="role-item">
-                    <div class="role-item-left">
-                        <span class="role-rank">${index + 1}</span>
-                        <span class="role-name">${escapeHtml(role.name)}</span>
-                    </div>
-                    <div class="role-item-right">
-                        <button class="btn-role-arrow" ${index === 0 ? 'disabled' : ''} onclick="moveRole(${index}, -1)" title="Move up">&#9650;</button>
-                        <button class="btn-role-arrow" ${index === cachedRoles.length - 1 ? 'disabled' : ''} onclick="moveRole(${index}, 1)" title="Move down">&#9660;</button>
-                        <button class="btn btn-danger-ghost" ${isDefault ? 'disabled title="Default role cannot be deleted"' : `onclick="deleteRole(${role.id})"`}>Delete</button>
-                    </div>
+                    <span class="role-name">${escapeHtml(role.name)}</span>
+                    <button class="btn btn-danger-ghost" ${isDefault ? 'disabled title="Default role cannot be deleted"' : `onclick="deleteRole(${role.id})"`}>Delete</button>
                 </div>`;
             });
             html += '</div>';
             container.innerHTML = html;
-        }
-
-        async function moveRole(index, direction) {
-            const newIndex = index + direction;
-            if (newIndex < 0 || newIndex >= cachedRoles.length) return;
-            [cachedRoles[index], cachedRoles[newIndex]] = [cachedRoles[newIndex], cachedRoles[index]];
-            const res = await fetch('/api/admin/roles/reorder', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-                body: JSON.stringify({ role_ids: cachedRoles.map(role => role.id) }),
-            });
-            if (!res.ok) {
-                await loadRoles();
-                alert((await res.json()).detail || 'Failed to save role order');
-                return;
-            }
-            await loadRoles();
         }
 
         async function deleteRole(id) {
