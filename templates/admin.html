@@ -1,40 +1,48 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BrainSprouts - Admin</title>
+    <meta name="theme-color" content="#166534">
+    <meta name="description" content="Manage BrainSprouts tutoring sessions, tutors, announcements, hours, and roles.">
+    <title>Administration | BrainSprouts</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260901-6">
 </head>
 <body>
-    <nav class="navbar">
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+    <nav class="navbar admin-navbar" aria-label="Administration navigation">
         <div class="nav-left">
-            <span class="nav-brand">BrainSprouts</span>
+            <a class="nav-brand" href="/admin" aria-current="page">BrainSprouts</a>
             <span class="nav-badge">Admin</span>
         </div>
-        <div class="nav-right">
-            <button class="btn btn-ghost tab-btn active" data-tab="schedule" onclick="switchTab('schedule')">Schedule</button>
-            <button class="btn btn-ghost tab-btn" data-tab="events" onclick="switchTab('events')">Manage Events</button>
-            <button class="btn btn-ghost tab-btn" data-tab="announcements" onclick="switchTab('announcements')">Announcements</button>
-            <button class="btn btn-ghost tab-btn" data-tab="users" onclick="switchTab('users')">Manage Tutors</button>
-            <button class="btn btn-ghost tab-btn" data-tab="hours" onclick="switchTab('hours')">Hours</button>
-            <button class="btn btn-ghost tab-btn" data-tab="roles" onclick="switchTab('roles')">Roles</button>
-            <button class="btn btn-ghost" onclick="logout()">Sign Out</button>
+        <div class="nav-right admin-nav-actions">
+            <div class="tab-list" role="tablist" aria-label="Administration sections">
+                <button type="button" id="tab-button-schedule" class="btn btn-ghost tab-btn active" role="tab" aria-selected="true" aria-controls="tab-schedule" tabindex="0" data-tab="schedule" onclick="switchTab('schedule')">Schedule</button>
+                <button type="button" id="tab-button-events" class="btn btn-ghost tab-btn" role="tab" aria-selected="false" aria-controls="tab-events" tabindex="-1" data-tab="events" onclick="switchTab('events')">Manage Events</button>
+                <button type="button" id="tab-button-announcements" class="btn btn-ghost tab-btn" role="tab" aria-selected="false" aria-controls="tab-announcements" tabindex="-1" data-tab="announcements" onclick="switchTab('announcements')">Announcements</button>
+                <button type="button" id="tab-button-users" class="btn btn-ghost tab-btn" role="tab" aria-selected="false" aria-controls="tab-users" tabindex="-1" data-tab="users" onclick="switchTab('users')">Manage Tutors</button>
+                <button type="button" id="tab-button-hours" class="btn btn-ghost tab-btn" role="tab" aria-selected="false" aria-controls="tab-hours" tabindex="-1" data-tab="hours" onclick="switchTab('hours')">Hours</button>
+                <button type="button" id="tab-button-roles" class="btn btn-ghost tab-btn" role="tab" aria-selected="false" aria-controls="tab-roles" tabindex="-1" data-tab="roles" onclick="switchTab('roles')">Roles</button>
+            </div>
+            <button type="button" class="btn btn-ghost sign-out-btn" onclick="logout()">Sign Out</button>
         </div>
     </nav>
 
-    <main class="container">
-        <div id="tab-schedule" class="tab-content">
+    <main class="container" id="main-content" tabindex="-1">
+        <section id="tab-schedule" class="tab-content" role="tabpanel" aria-labelledby="tab-button-schedule" tabindex="0">
             <div class="page-header">
-                <h2>Session Overview</h2>
+                <h1>Session Overview</h1>
+                <p class="sr-only">Review attendance and remaining capacity for each session.</p>
             </div>
-            <div id="adminEvents"></div>
-        </div>
+            <div id="adminEvents" aria-busy="true"><p class="loading-status" role="status">Loading sessions…</p></div>
+        </section>
 
-        <div id="tab-events" class="tab-content is-hidden">
+        <section id="tab-events" class="tab-content" role="tabpanel" aria-labelledby="tab-button-events" tabindex="0" hidden>
             <div class="page-header">
-                <h2>Manage Events</h2>
+                <h1>Manage Events</h1>
             </div>
 
             <div class="create-user-card">
@@ -47,6 +55,12 @@
                         <div class="form-group">
                             <label for="evDate">Date</label>
                             <input type="date" id="evDate" required>
+                        </div>
+                        <div class="form-group form-group-location">
+                            <label for="evLocation">Location</label>
+                            <select id="evLocation" class="select-input">
+                                <option value="">No location assigned</option>
+                            </select>
                         </div>
                     </div>
                     <div class="form-row form-row-spaced">
@@ -62,45 +76,58 @@
                             <label for="evCapacity">Max Capacity</label>
                             <input type="number" id="evCapacity" required value="15" min="1">
                         </div>
-                        <button type="submit" class="btn btn-primary btn-create">Add Event</button>
+                        <div class="form-group form-group-repeat">
+                            <label for="evRepeatMode">Repeats</label>
+                            <select id="evRepeatMode" class="select-input" aria-controls="repeatCountGroup">
+                                <option value="once">Does not repeat</option>
+                                <option value="weekly">Once a week</option>
+                            </select>
+                        </div>
+                        <div class="form-group form-group-repeat-count" id="repeatCountGroup" hidden>
+                            <label for="evRepeatCount">Number of events</label>
+                            <input type="number" id="evRepeatCount" value="6" min="2" max="52" aria-describedby="repeatHelp">
+                        </div>
+                        <button type="submit" id="createEventButton" class="btn btn-primary btn-create">Add Event</button>
                     </div>
+                    <p class="field-help event-repeat-help" id="repeatHelp" aria-live="polite">Creates one event.</p>
                 </form>
-                <div id="evMsg" class="msg is-hidden"></div>
+                <div id="evMsg" class="msg is-hidden" role="status" aria-live="polite"></div>
             </div>
 
-            <div id="eventList"></div>
-        </div>
+            <div id="eventList" aria-busy="true"><p class="loading-status" role="status">Loading events…</p></div>
+        </section>
 
-        <div id="tab-users" class="tab-content is-hidden">
+        <section id="tab-users" class="tab-content" role="tabpanel" aria-labelledby="tab-button-users" tabindex="0" hidden>
             <div class="page-header">
-                <h2>Manage Tutors</h2>
+                <h1>Manage Tutors</h1>
             </div>
 
             <div class="create-user-card">
                 <form id="createUserForm" class="form-row">
                     <div class="form-group">
                         <label for="newDisplay">Display Name</label>
-                        <input type="text" id="newDisplay" required placeholder="e.g. Andy Yu">
+                        <input type="text" id="newDisplay" name="display_name" required autocomplete="name" placeholder="e.g. Andy Yu">
                     </div>
                     <div class="form-group">
                         <label for="newUsername">Username</label>
-                        <input type="text" id="newUsername" required placeholder="e.g. AndyYuIsSoCool">
+                        <input type="text" id="newUsername" name="username" required autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="e.g. AndyYuIsSoCool">
                     </div>
                     <div class="form-group">
                         <label for="newPassword">Password</label>
-                        <input type="text" id="newPassword" required placeholder="Min 6 character!">
+                        <input type="password" id="newPassword" name="new-password" required minlength="6" autocomplete="new-password" placeholder="Min 6 character!" aria-describedby="newPasswordHelp">
+                        <span class="sr-only" id="newPasswordHelp">Use at least 6 characters.</span>
                     </div>
                     <button type="submit" class="btn btn-primary btn-create">Create Account!!</button>
                 </form>
-                <div id="createMsg" class="msg is-hidden"></div>
+                <div id="createMsg" class="msg is-hidden" role="status" aria-live="polite"></div>
             </div>
 
-            <div class="users-list" id="usersList"></div>
-        </div>
+            <div class="users-list" id="usersList" aria-busy="true"><p class="loading-status" role="status">Loading tutors…</p></div>
+        </section>
 
-        <div id="tab-announcements" class="tab-content is-hidden">
+        <section id="tab-announcements" class="tab-content" role="tabpanel" aria-labelledby="tab-button-announcements" tabindex="0" hidden>
             <div class="page-header">
-                <h2>Announcements</h2>
+                <h1>Announcements</h1>
             </div>
 
             <div class="create-user-card">
@@ -118,12 +145,12 @@
                 </form>
             </div>
 
-            <div id="annList"></div>
-        </div>
+            <div id="annList" aria-busy="true"><p class="loading-status" role="status">Loading announcements…</p></div>
+        </section>
 
-        <div id="tab-hours" class="tab-content is-hidden">
+        <section id="tab-hours" class="tab-content" role="tabpanel" aria-labelledby="tab-button-hours" tabindex="0" hidden>
             <div class="page-header">
-                <h2>Hour Tracker</h2>
+                <h1>Hour Tracker</h1>
             </div>
 
             <div class="create-user-card">
@@ -131,12 +158,13 @@
                 <form id="logHoursForm">
                     <div class="form-row">
                         <div class="form-group form-group-tutor-select">
-                            <label>Tutors</label>
+                            <span class="field-label" id="hrTutorSelectLabel">Tutors</span>
                             <div class="multi-select" id="hrTutorSelect">
-                                <div class="multi-select-toggle" onclick="toggleMultiSelect()">
+                                <button type="button" class="multi-select-toggle" id="hrTutorToggle" aria-labelledby="hrTutorSelectLabel hrTutorLabel" aria-haspopup="true" aria-expanded="false" aria-controls="hrTutorDropdown" onclick="toggleMultiSelect()">
                                     <span id="hrTutorLabel">Select tutors...</span>
-                                </div>
-                                <div class="multi-select-dropdown" id="hrTutorDropdown"></div>
+                                    <span aria-hidden="true">▾</span>
+                                </button>
+                                <div class="multi-select-dropdown" id="hrTutorDropdown" role="group" aria-label="Tutor choices"></div>
                             </div>
                         </div>
                         <div class="form-group">
@@ -154,22 +182,22 @@
                     </div>
                     <button type="submit" class="btn btn-primary btn-log-hours">Log Hours</button>
                 </form>
-                <div id="hrMsg" class="msg is-hidden"></div>
+                <div id="hrMsg" class="msg is-hidden" role="status" aria-live="polite"></div>
             </div>
 
             <div class="hours-filter">
-                <label class="hours-filter-label">Filter by tutor:</label>
+                <label class="hours-filter-label" for="hrFilter">Filter by tutor</label>
                 <select id="hrFilter" class="select-input hours-filter-select">
                     <option value="">All Tutors</option>
                 </select>
             </div>
 
-            <div id="hoursList"></div>
-        </div>
+            <div id="hoursList" aria-busy="true"><p class="loading-status" role="status">Loading hours…</p></div>
+        </section>
 
-        <div id="tab-roles" class="tab-content is-hidden">
+        <section id="tab-roles" class="tab-content" role="tabpanel" aria-labelledby="tab-button-roles" tabindex="0" hidden>
             <div class="page-header">
-                <h2>Manage Roles</h2>
+                <h1>Manage Roles</h1>
             </div>
 
             <div class="create-user-card">
@@ -180,20 +208,25 @@
                     </div>
                     <button type="submit" class="btn btn-primary btn-create">Add Role</button>
                 </form>
-                <div id="roleMsg" class="msg is-hidden"></div>
+                <div id="roleMsg" class="msg is-hidden" role="status" aria-live="polite"></div>
             </div>
 
-            <div id="rolesList"></div>
-        </div>
+            <div id="rolesList" aria-busy="true"><p class="loading-status" role="status">Loading roles…</p></div>
+        </section>
 
     </main>
 
+    <div class="sr-only" id="liveStatus" role="status" aria-live="polite" aria-atomic="true"></div>
+
     <script>
         const token = localStorage.getItem('bs_token');
-        const user = JSON.parse(localStorage.getItem('bs_user'));
+        let user = null;
+        try { user = JSON.parse(localStorage.getItem('bs_user')); } catch { localStorage.removeItem('bs_user'); }
         if (!token || !user || !user.is_admin) { window.location.href = '/'; }
 
         let cachedRoles = [];
+        let eventLocations = [];
+        let allUsers = [];
 
         function formatDate(dateStr) {
             return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', {
@@ -216,17 +249,79 @@
             return div.innerHTML;
         }
 
+        function announce(message) {
+            const liveStatus = document.getElementById('liveStatus');
+            liveStatus.textContent = '';
+            window.setTimeout(() => { liveStatus.textContent = message; }, 10);
+        }
+
+        function showLoadError(container, message, retryFunction) {
+            container.removeAttribute('aria-busy');
+            container.innerHTML = `<div class="error-state" role="alert">
+                <p>${escapeHtml(message)}</p>
+                <button type="button" class="btn btn-secondary" id="retry-${container.id}">Try again</button>
+            </div>`;
+            document.getElementById(`retry-${container.id}`).addEventListener('click', retryFunction);
+        }
+
+        function locationOptions(selectedLocation = '') {
+            return '<option value="">No location assigned</option>' + eventLocations.map(location => {
+                const safeLocation = escapeHtml(location);
+                const selected = location === selectedLocation ? ' selected' : '';
+                return `<option value="${safeLocation}"${selected}>${safeLocation}</option>`;
+            }).join('');
+        }
+
+        function renderDistanceBlock(ev) {
+            if (!ev.location_tag || !Array.isArray(ev.distances) || ev.distances.length === 0) return '';
+            const location = escapeHtml(ev.location_tag);
+            const rows = ev.distances.map(distance => `
+                <a class="distance-row" href="${escapeHtml(distance.google_maps_url)}" target="_blank" rel="noopener noreferrer">
+                    <span class="distance-route">${escapeHtml(distance.school)} <span aria-hidden="true">&rarr;</span> ${location}</span>
+                    <span class="distance-measurements">
+                        <strong>${escapeHtml(distance.duration_text)}</strong>
+                        <span>${escapeHtml(distance.distance_text)}</span>
+                    </span>
+                </a>`).join('');
+            return `<details class="distance-disclosure">
+                <summary class="distance-toggle">[distances]</summary>
+                <div class="distance-panel">
+                    <div class="distance-heading">Driving to ${location}</div>
+                    ${rows}
+                    <div class="distance-note">Fixed driving estimate &middot; Select a route for current Google Maps directions</div>
+                </div>
+            </details>`;
+        }
+
+        async function loadEventLocations() {
+            const res = await fetch('/api/event-locations', {
+                headers: { 'Authorization': 'Bearer ' + token },
+            });
+            if (res.status === 401 || res.status === 403) { logout(); return; }
+            if (!res.ok) return;
+            eventLocations = await res.json();
+            document.getElementById('evLocation').innerHTML = locationOptions();
+        }
+
         function showMsg(element, ok, text) {
             element.className = ok ? 'msg msg-success' : 'msg msg-error';
+            element.setAttribute('role', ok ? 'status' : 'alert');
             element.textContent = text;
-            setTimeout(() => element.classList.add('is-hidden'), 3000);
         }
 
         function switchTab(tab) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('is-hidden'));
-            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-            document.getElementById('tab-' + tab).classList.remove('is-hidden');
-            document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+            document.querySelectorAll('.tab-content').forEach(el => { el.hidden = true; });
+            document.querySelectorAll('.tab-btn').forEach(el => {
+                el.classList.remove('active');
+                el.setAttribute('aria-selected', 'false');
+                el.tabIndex = -1;
+            });
+            const panel = document.getElementById('tab-' + tab);
+            const button = document.querySelector(`[data-tab="${tab}"]`);
+            panel.hidden = false;
+            button.classList.add('active');
+            button.setAttribute('aria-selected', 'true');
+            button.tabIndex = 0;
             if (tab === 'schedule') loadAdminEvents();
             if (tab === 'events') loadEventList();
             if (tab === 'users') loadUsers();
@@ -235,17 +330,40 @@
             if (tab === 'roles') loadRoles();
         }
 
+        document.querySelector('.tab-list').addEventListener('keydown', (event) => {
+            const tabs = Array.from(document.querySelectorAll('.tab-btn'));
+            const currentIndex = tabs.indexOf(document.activeElement);
+            if (currentIndex < 0) return;
+            let nextIndex = currentIndex;
+            if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % tabs.length;
+            else if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+            else if (event.key === 'Home') nextIndex = 0;
+            else if (event.key === 'End') nextIndex = tabs.length - 1;
+            else return;
+            event.preventDefault();
+            tabs[nextIndex].focus();
+            switchTab(tabs[nextIndex].dataset.tab);
+        });
+
         async function loadAdminEvents() {
-            const res = await fetch('/api/admin/events', {
-                headers: { 'Authorization': 'Bearer ' + token }
-            });
-            if (res.status === 401 || res.status === 403) { logout(); return; }
-            const events = await res.json();
-            renderAdminEvents(events);
+            const container = document.getElementById('adminEvents');
+            container.setAttribute('aria-busy', 'true');
+            try {
+                const res = await fetch('/api/admin/events', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                if (res.status === 401 || res.status === 403) { logout(); return; }
+                if (!res.ok) throw new Error('Unable to load sessions.');
+                const events = await res.json();
+                renderAdminEvents(events);
+            } catch (error) {
+                showLoadError(container, error.message || 'Unable to load sessions.', loadAdminEvents);
+            }
         }
 
         function renderAdminEvents(events) {
             const container = document.getElementById('adminEvents');
+            container.removeAttribute('aria-busy');
             if (events.length === 0) {
                 container.innerHTML = '<p class="text-muted">No events scheduled. Go to Manage Events to add some.</p>';
                 return;
@@ -260,7 +378,7 @@
             let html = '';
             for (const [month, evts] of Object.entries(byMonth)) {
                 const d = new Date(month + '-15');
-                html += `<div class="month-section">
+                html += `<section class="month-section">
                     <h3 class="month-title">${d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h3>`;
                 evts.forEach(ev => {
                     const isPast = new Date(ev.date + 'T23:59:59') < new Date();
@@ -270,11 +388,12 @@
                     const spotsLeft = ev.max_capacity - ev.yes_count;
 
                     html += `
-                    <div class="admin-event-card ${isPast ? 'event-past' : ''}">
+                    <article class="admin-event-card ${isPast ? 'event-past' : ''}">
                         <div class="admin-event-header">
                             <div>
-                                <div class="event-date">${formatDate(ev.date)}</div>
-                                <div class="event-time">${formatTime(ev.start_time)} - ${formatTime(ev.end_time)} &middot; ${ev.title}</div>
+                                <h4 class="event-date">${formatDate(ev.date)}</h4>
+                                <p class="event-time">${formatTime(ev.start_time)} - ${formatTime(ev.end_time)} &middot; ${escapeHtml(ev.title)}</p>
+                                ${renderDistanceBlock(ev)}
                             </div>
                             <div class="admin-counts">
                                 <span class="count-badge count-yes">${ev.yes_count} Yes</span>
@@ -287,20 +406,20 @@
                         <div class="rsvp-details">
                             ${yesRsvps.length > 0 ? `<div class="rsvp-group">
                                 <div class="rsvp-group-label status-yes-text">Attending</div>
-                                ${yesRsvps.map(r => `<span class="rsvp-name">${r.display_name}</span>`).join('')}
+                                ${yesRsvps.map(r => `<span class="rsvp-name">${escapeHtml(r.display_name)}</span>`).join('')}
                             </div>` : ''}
                             ${maybeRsvps.length > 0 ? `<div class="rsvp-group">
                                 <div class="rsvp-group-label status-maybe-text">Maybe</div>
-                                ${maybeRsvps.map(r => `<span class="rsvp-name">${r.display_name}</span>`).join('')}
+                                ${maybeRsvps.map(r => `<span class="rsvp-name">${escapeHtml(r.display_name)}</span>`).join('')}
                             </div>` : ''}
                             ${noRsvps.length > 0 ? `<div class="rsvp-group">
                                 <div class="rsvp-group-label status-no-text">Not Attending</div>
-                                ${noRsvps.map(r => `<span class="rsvp-name">${r.display_name}</span>`).join('')}
+                                ${noRsvps.map(r => `<span class="rsvp-name">${escapeHtml(r.display_name)}</span>`).join('')}
                             </div>` : ''}
                         </div>` : '<div class="rsvp-details"><span class="text-muted">No responses yet</span></div>'}
-                    </div>`;
+                    </article>`;
                 });
-                html += `</div>`;
+                html += `</section>`;
             }
             container.innerHTML = html;
         }
@@ -308,15 +427,25 @@
         let allEvents = [];
 
         async function loadEventList() {
-            const res = await fetch('/api/admin/events', {
-                headers: { 'Authorization': 'Bearer ' + token }
-            });
-            allEvents = await res.json();
-            renderEventList();
+            const container = document.getElementById('eventList');
+            container.setAttribute('aria-busy', 'true');
+            try {
+                if (eventLocations.length === 0) await loadEventLocations();
+                const res = await fetch('/api/admin/events', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                if (res.status === 401 || res.status === 403) { logout(); return; }
+                if (!res.ok) throw new Error('Unable to load events.');
+                allEvents = await res.json();
+                renderEventList();
+            } catch (error) {
+                showLoadError(container, error.message || 'Unable to load events.', loadEventList);
+            }
         }
 
         function renderEventList() {
             const container = document.getElementById('eventList');
+            container.removeAttribute('aria-busy');
             if (allEvents.length === 0) {
                 container.innerHTML = '<p class="text-muted content-empty-spaced">No events yet.</p>';
                 return;
@@ -324,19 +453,23 @@
 
             let html = '';
 
-            html += '<h3 class="section-heading-spaced">All Events</h3><div class="users-table table-spaced-sm">';
-            html += `<div class="table-header table-events">
-                <span>Date</span><span>Title</span><span>Time</span><span>Capacity</span><span></span>
+            html += '<h3 class="section-heading-spaced" id="events-table-heading">All Events</h3><div class="users-table table-spaced-sm" role="table" aria-labelledby="events-table-heading">';
+            html += `<div class="table-header table-events" role="row">
+                <span role="columnheader">Date</span><span role="columnheader">Title</span><span role="columnheader">Time</span><span role="columnheader">Capacity</span><span role="columnheader">Actions</span>
             </div>`;
             allEvents.forEach(ev => {
-                html += `<div class="table-row table-events" id="ev-row-${ev.id}">
-                    <span class="user-name">${formatDate(ev.date)}</span>
-                    <span>${ev.title}</span>
-                    <span class="text-muted">${formatTime(ev.start_time)} - ${formatTime(ev.end_time)}</span>
-                    <span class="text-muted">${ev.yes_count}/${ev.max_capacity}</span>
-                    <span class="inline-actions">
-                        <button class="btn btn-danger-ghost btn-secondary-ghost" onclick="editEvent(${ev.id})">Edit</button>
-                        <button class="btn btn-danger-ghost" onclick="deleteEvent(${ev.id})">Delete</button>
+                html += `<div class="table-row table-events" role="row" id="ev-row-${ev.id}">
+                    <span class="user-name" role="cell" data-label="Date">${formatDate(ev.date)}</span>
+                    <span class="event-table-details" role="cell" data-label="Title">
+                        <span>${escapeHtml(ev.title)}</span>
+                        ${ev.location_tag ? `<span class="location-tag">${escapeHtml(ev.location_tag)}</span>` : '<span class="location-unassigned">No location</span>'}
+                    </span>
+                    <span class="text-muted" role="cell" data-label="Time">${formatTime(ev.start_time)} - ${formatTime(ev.end_time)}</span>
+                    <span class="text-muted" role="cell" data-label="Capacity">${ev.yes_count}/${ev.max_capacity}</span>
+                    <span class="inline-actions" role="cell" data-label="Actions">
+                        <button type="button" class="btn btn-danger-ghost btn-secondary-ghost" onclick="duplicateEvent(${ev.id})">Duplicate</button>
+                        <button type="button" class="btn btn-danger-ghost btn-secondary-ghost" onclick="editEvent(${ev.id})">Edit</button>
+                        <button type="button" class="btn btn-danger-ghost" onclick="deleteEvent(${ev.id})">Delete</button>
                     </span>
                 </div>`;
             });
@@ -344,50 +477,132 @@
             container.innerHTML = html;
         }
 
+        function addDays(dateStr, days) {
+            const [year, month, day] = dateStr.split('-').map(Number);
+            const date = new Date(Date.UTC(year, month - 1, day + days));
+            return date.toISOString().slice(0, 10);
+        }
+
+        function selectedRepeatCount() {
+            if (document.getElementById('evRepeatMode').value !== 'weekly') return 1;
+            const count = parseInt(document.getElementById('evRepeatCount').value, 10);
+            return Number.isInteger(count) ? Math.min(52, Math.max(2, count)) : 2;
+        }
+
+        function updateRepeatControls() {
+            const repeatsWeekly = document.getElementById('evRepeatMode').value === 'weekly';
+            const countGroup = document.getElementById('repeatCountGroup');
+            const countInput = document.getElementById('evRepeatCount');
+            const date = document.getElementById('evDate').value;
+            const count = selectedRepeatCount();
+            countGroup.hidden = !repeatsWeekly;
+            countInput.required = repeatsWeekly;
+            document.getElementById('createEventButton').textContent = repeatsWeekly
+                ? `Add ${count} Events`
+                : 'Add Event';
+            document.getElementById('repeatHelp').textContent = repeatsWeekly
+                ? (date
+                    ? `Creates ${count} independent events, one week apart, through ${formatDate(addDays(date, (count - 1) * 7))}.`
+                    : `Creates ${count} independent events, one week apart.`)
+                : 'Creates one event.';
+        }
+
+        document.getElementById('evRepeatMode').addEventListener('change', updateRepeatControls);
+        document.getElementById('evRepeatCount').addEventListener('input', updateRepeatControls);
+        document.getElementById('evDate').addEventListener('input', updateRepeatControls);
+        updateRepeatControls();
+
         document.getElementById('createEventForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const msgEl = document.getElementById('evMsg');
-            const res = await fetch('/api/admin/events', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-                body: JSON.stringify({
-                    title: document.getElementById('evTitle').value,
-                    event_date: document.getElementById('evDate').value,
-                    start_time: document.getElementById('evStart').value,
-                    end_time: document.getElementById('evEnd').value,
-                    max_capacity: parseInt(document.getElementById('evCapacity').value),
-                }),
-            });
-            if (!res.ok) {
-                msgEl.className = 'msg msg-error';
-                msgEl.textContent = (await res.json()).detail;
-                return;
+            const submitButton = document.getElementById('createEventButton');
+            const repeatCount = selectedRepeatCount();
+            submitButton.disabled = true;
+            try {
+                const res = await fetch('/api/admin/events', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                    body: JSON.stringify({
+                        title: document.getElementById('evTitle').value,
+                        event_date: document.getElementById('evDate').value,
+                        start_time: document.getElementById('evStart').value,
+                        end_time: document.getElementById('evEnd').value,
+                        max_capacity: parseInt(document.getElementById('evCapacity').value),
+                        location_tag: document.getElementById('evLocation').value || null,
+                        repeat_count: repeatCount,
+                    }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    showMsg(msgEl, false, data.detail || 'Failed to create event');
+                    return;
+                }
+                const createdCount = data.created_count || repeatCount;
+                const message = createdCount === 1
+                    ? 'Event added. You can edit its time below.'
+                    : `${createdCount} weekly events added. You can edit each event's time below.`;
+                showMsg(msgEl, true, message);
+                document.getElementById('evDate').value = '';
+                document.getElementById('evRepeatMode').value = 'once';
+                updateRepeatControls();
+                announce(message);
+                await loadEventList();
+            } catch (error) {
+                showMsg(msgEl, false, 'Unable to create events. Check your connection and try again.');
+            } finally {
+                submitButton.disabled = false;
             }
-            msgEl.classList.add('is-hidden');
-            document.getElementById('evDate').value = '';
-            loadEventList();
         });
+
+        function duplicateEvent(id) {
+            const ev = allEvents.find(event => event.id === id);
+            if (!ev) return;
+            const occupiedDates = new Set(allEvents.map(event => event.date));
+            let nextDate = addDays(ev.date, 7);
+            while (occupiedDates.has(nextDate)) {
+                nextDate = addDays(nextDate, 7);
+            }
+            document.getElementById('evTitle').value = ev.title;
+            document.getElementById('evDate').value = nextDate;
+            document.getElementById('evLocation').value = ev.location_tag || '';
+            document.getElementById('evStart').value = ev.start_time;
+            document.getElementById('evEnd').value = ev.end_time;
+            document.getElementById('evCapacity').value = ev.max_capacity;
+            document.getElementById('evRepeatMode').value = 'once';
+            updateRepeatControls();
+            const message = `Copy ready for ${formatDate(nextDate)}. Review it, then select Add Event.`;
+            showMsg(document.getElementById('evMsg'), true, message);
+            document.querySelector('#createEventForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            document.getElementById('evDate').focus({ preventScroll: true });
+            announce(message);
+        }
 
         function editEvent(id) {
             const ev = allEvents.find(e => e.id === id);
             const row = document.getElementById('ev-row-' + id);
             row.innerHTML = `
-                <span class="user-name">${formatDate(ev.date)}</span>
-                <span><input type="text" id="editEvTitle-${id}" value="${ev.title}" class="inline-edit-input inline-edit-input-full"></span>
-                <span class="inline-actions">
-                    <input type="time" id="editEvStart-${id}" value="${ev.start_time}" class="inline-edit-input inline-edit-input-time">
-                    <input type="time" id="editEvEnd-${id}" value="${ev.end_time}" class="inline-edit-input inline-edit-input-time">
+                <span class="user-name" role="cell" data-label="Date">${formatDate(ev.date)}</span>
+                <span class="event-edit-details" role="cell" data-label="Title and location">
+                    <input type="text" id="editEvTitle-${id}" value="${escapeHtml(ev.title)}" class="inline-edit-input inline-edit-input-full" aria-label="Event title">
+                    <select id="editEvLocation-${id}" class="inline-edit-input inline-edit-select" aria-label="Event location">
+                        ${locationOptions(ev.location_tag || '')}
+                    </select>
                 </span>
-                <span><input type="number" id="editEvCap-${id}" value="${ev.max_capacity}" min="1" class="inline-edit-input inline-edit-input-capacity"></span>
-                <span class="inline-actions">
-                    <button class="btn btn-danger-ghost btn-save-ghost" onclick="saveEvent(${id})">Save</button>
-                    <button class="btn btn-danger-ghost btn-secondary-ghost" onclick="renderEventList()">Cancel</button>
+                <span class="inline-actions" role="cell" data-label="Time">
+                    <input type="time" id="editEvStart-${id}" value="${ev.start_time}" class="inline-edit-input inline-edit-input-time" aria-label="Start time">
+                    <input type="time" id="editEvEnd-${id}" value="${ev.end_time}" class="inline-edit-input inline-edit-input-time" aria-label="End time">
+                </span>
+                <span role="cell" data-label="Capacity"><input type="number" id="editEvCap-${id}" value="${ev.max_capacity}" min="1" class="inline-edit-input inline-edit-input-capacity" aria-label="Maximum capacity"></span>
+                <span class="inline-actions" role="cell" data-label="Actions">
+                    <button type="button" class="btn btn-danger-ghost btn-save-ghost" onclick="saveEvent(${id})">Save</button>
+                    <button type="button" class="btn btn-danger-ghost btn-secondary-ghost" onclick="renderEventList()">Cancel</button>
                 </span>
             `;
+            document.getElementById('editEvTitle-' + id).focus();
         }
 
         async function saveEvent(id) {
-            await fetch(`/api/admin/events/${id}`, {
+            const res = await fetch(`/api/admin/events/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
                 body: JSON.stringify({
@@ -395,16 +610,25 @@
                     start_time: document.getElementById('editEvStart-' + id).value,
                     end_time: document.getElementById('editEvEnd-' + id).value,
                     max_capacity: parseInt(document.getElementById('editEvCap-' + id).value),
+                    location_tag: document.getElementById('editEvLocation-' + id).value || null,
                 }),
             });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                alert(data.detail || 'Failed to update event');
+                return;
+            }
             loadEventList();
         }
 
         async function deleteEvent(id) {
+            const event = allEvents.find(item => item.id === id);
+            if (!event || !confirm(`Delete ${event.title} on ${formatDate(event.date)}?`)) return;
             await fetch(`/api/admin/events/${id}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': 'Bearer ' + token },
             });
+            announce('Event deleted.');
             loadEventList();
         }
 
@@ -418,35 +642,44 @@
         }
 
         async function loadUsers() {
-            const [usersRes] = await Promise.all([
-                fetch('/api/admin/users', {
-                    headers: { 'Authorization': 'Bearer ' + token },
-                }),
-                fetchRoles(),
-            ]);
-            const users = await usersRes.json();
             const list = document.getElementById('usersList');
-            let html = '<h3>Current Tutors</h3><div class="users-table">';
-            html += `<div class="table-header table-5col">
-                <span>Name</span><span>Username</span><span>Executive Title</span><span>Created</span><span></span>
-            </div>`;
-            users.forEach(u => {
-                const availableRoles = cachedRoles.some(role => role.name === u.executive_title)
-                    ? cachedRoles
-                    : [{ id: null, name: u.executive_title || 'Jr. Tutor' }, ...cachedRoles];
-                const titleSelect = !u.is_admin ? `<select class="select-input select-input-compact" onchange="updateTitle(${u.id}, this.value)">
-                    ${availableRoles.map(role => `<option value="${escapeHtml(role.name)}" ${u.executive_title === role.name ? 'selected' : ''}>${escapeHtml(role.name)}</option>`).join('')}
-                    </select>` : '';
-                html += `<div class="table-row table-5col">
-                    <span class="user-name">${escapeHtml(u.display_name)} ${u.is_admin ? '<span class="nav-badge">Admin</span>' : ''}</span>
-                    <span class="text-muted">${escapeHtml(u.username)}</span>
-                    <span>${titleSelect}</span>
-                    <span class="text-muted">${String(u.created_at).split(/[ T]/)[0]}</span>
-                    <span>${!u.is_admin ? `<button class="btn btn-danger-ghost" onclick="deleteUser(${u.id})">Remove</button>` : ''}</span>
+            list.setAttribute('aria-busy', 'true');
+            try {
+                const [usersRes] = await Promise.all([
+                    fetch('/api/admin/users', {
+                        headers: { 'Authorization': 'Bearer ' + token },
+                    }),
+                    fetchRoles(),
+                ]);
+                if (usersRes.status === 401 || usersRes.status === 403) { logout(); return; }
+                if (!usersRes.ok) throw new Error('Unable to load tutors.');
+                const users = await usersRes.json();
+                allUsers = users;
+                let html = '<h3 id="tutors-table-heading">Current Tutors</h3><div class="users-table" role="table" aria-labelledby="tutors-table-heading">';
+                html += `<div class="table-header table-5col" role="row">
+                    <span role="columnheader">Name</span><span role="columnheader">Username</span><span role="columnheader">Executive Title</span><span role="columnheader">Created</span><span role="columnheader">Actions</span>
                 </div>`;
-            });
-            html += '</div>';
-            list.innerHTML = html;
+                users.forEach(u => {
+                    const availableRoles = cachedRoles.some(role => role.name === u.executive_title)
+                        ? cachedRoles
+                        : [{ id: null, name: u.executive_title || 'Jr. Tutor' }, ...cachedRoles];
+                    const titleSelect = !u.is_admin ? `<select class="select-input select-input-compact" aria-label="Executive title for ${escapeHtml(u.display_name)}" onchange="updateTitle(${u.id}, this.value)">
+                        ${availableRoles.map(role => `<option value="${escapeHtml(role.name)}" ${u.executive_title === role.name ? 'selected' : ''}>${escapeHtml(role.name)}</option>`).join('')}
+                        </select>` : '';
+                    html += `<div class="table-row table-5col" role="row">
+                        <span class="user-name" role="cell" data-label="Name">${escapeHtml(u.display_name)} ${u.is_admin ? '<span class="nav-badge">Admin</span>' : ''}</span>
+                        <span class="text-muted" role="cell" data-label="Username">${escapeHtml(u.username)}</span>
+                        <span role="cell" data-label="Executive Title">${titleSelect || escapeHtml(u.executive_title || '')}</span>
+                        <span class="text-muted" role="cell" data-label="Created">${String(u.created_at).split(/[ T]/)[0]}</span>
+                        <span role="cell" data-label="Actions">${!u.is_admin ? `<button type="button" class="btn btn-danger-ghost" onclick="deleteUser(${u.id})">Remove</button>` : ''}</span>
+                    </div>`;
+                });
+                html += '</div>';
+                list.innerHTML = html;
+                list.removeAttribute('aria-busy');
+            } catch (error) {
+                showLoadError(list, error.message || 'Unable to load tutors.', loadUsers);
+            }
         }
 
         async function updateTitle(userId, title) {
@@ -470,49 +703,61 @@
                 }),
             });
             if (!res.ok) {
-                msgEl.className = 'msg msg-error';
-                msgEl.textContent = (await res.json()).detail;
+                showMsg(msgEl, false, (await res.json()).detail || 'Failed to create account');
                 return;
             }
             msgEl.classList.add('is-hidden');
             document.getElementById('createUserForm').reset();
+            announce('Tutor account created.');
             loadUsers();
         });
 
         async function deleteUser(id) {
+            const tutor = allUsers.find(item => item.id === id);
+            const name = tutor ? tutor.display_name : 'this tutor';
+            if (!confirm(`Remove ${name}? Their RSVPs and logged hours will also be deleted.`)) return;
             await fetch(`/api/admin/users/${id}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': 'Bearer ' + token },
             });
+            announce(`${name} was removed.`);
             loadUsers();
         }
 
         async function loadAnnouncements() {
-            const res = await fetch('/api/announcements', {
-                headers: { 'Authorization': 'Bearer ' + token }
-            });
-            const anns = await res.json();
             const container = document.getElementById('annList');
-            if (anns.length === 0) {
-                container.innerHTML = '<p class="text-muted content-empty-spaced">No announcements yet.</p>';
-                return;
-            }
-            let html = '<h3 class="announcement-heading-spaced">Previous Announcements</h3>';
-            anns.forEach(a => {
-                const date = new Date(a.created_at + 'Z');
-                const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                html += `<div class="announcement-card announcement-card-spaced">
-                    <div class="ann-header">
-                        <span class="ann-title">${a.title}</span>
-                        <div class="announcement-meta-actions">
-                            <span class="ann-date">${dateStr}</span>
-                            <button class="btn btn-danger-ghost" onclick="deleteAnnouncement(${a.id})">Delete</button>
+            container.setAttribute('aria-busy', 'true');
+            try {
+                const res = await fetch('/api/announcements', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                if (res.status === 401) { logout(); return; }
+                if (!res.ok) throw new Error('Unable to load announcements.');
+                const anns = await res.json();
+                container.removeAttribute('aria-busy');
+                if (anns.length === 0) {
+                    container.innerHTML = '<p class="text-muted content-empty-spaced">No announcements yet.</p>';
+                    return;
+                }
+                let html = '<h3 class="announcement-heading-spaced">Previous Announcements</h3>';
+                anns.forEach(a => {
+                    const date = new Date(a.created_at + 'Z');
+                    const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                    html += `<article class="announcement-card announcement-card-spaced">
+                        <div class="ann-header">
+                            <h4 class="ann-title">${escapeHtml(a.title)}</h4>
+                            <div class="announcement-meta-actions">
+                                <time class="ann-date" datetime="${date.toISOString()}">${dateStr}</time>
+                                <button type="button" class="btn btn-danger-ghost" onclick="deleteAnnouncement(${a.id})">Delete</button>
+                            </div>
                         </div>
-                    </div>
-                    <p class="ann-body">${a.body}</p>
-                </div>`;
-            });
-            container.innerHTML = html;
+                        <p class="ann-body">${escapeHtml(a.body)}</p>
+                    </article>`;
+                });
+                container.innerHTML = html;
+            } catch (error) {
+                showLoadError(container, error.message || 'Unable to load announcements.', loadAnnouncements);
+            }
         }
 
         document.getElementById('createAnnForm').addEventListener('submit', async (e) => {
@@ -526,14 +771,17 @@
                 }),
             });
             document.getElementById('createAnnForm').reset();
+            announce('Announcement posted.');
             loadAnnouncements();
         });
 
         async function deleteAnnouncement(id) {
+            if (!confirm('Delete this announcement?')) return;
             await fetch(`/api/admin/announcements/${id}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': 'Bearer ' + token },
             });
+            announce('Announcement deleted.');
             loadAnnouncements();
         }
 
@@ -543,13 +791,27 @@
 
         function toggleMultiSelect() {
             const dd = document.getElementById('hrTutorDropdown');
-            dd.classList.toggle('open');
+            const toggle = document.getElementById('hrTutorToggle');
+            const isOpen = dd.classList.toggle('open');
+            toggle.setAttribute('aria-expanded', String(isOpen));
+        }
+
+        function closeMultiSelect() {
+            document.getElementById('hrTutorDropdown').classList.remove('open');
+            document.getElementById('hrTutorToggle').setAttribute('aria-expanded', 'false');
         }
 
         document.addEventListener('click', (e) => {
             const sel = document.getElementById('hrTutorSelect');
             if (!sel.contains(e.target)) {
-                document.getElementById('hrTutorDropdown').classList.remove('open');
+                closeMultiSelect();
+            }
+        });
+
+        document.getElementById('hrTutorSelect').addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                closeMultiSelect();
+                document.getElementById('hrTutorToggle').focus();
             }
         });
 
@@ -588,35 +850,44 @@
             const filt = document.getElementById('hrFilter');
             const curFilt = filt.value;
 
-            dd.innerHTML = `<label class="multi-select-item" onclick="selectAllTutors()">
+            dd.innerHTML = `<button type="button" class="multi-select-item multi-select-item-button" onclick="selectAllTutors()">
                 <span class="select-all-label">Select All</span>
-            </label>`;
+            </button>`;
             tutors.forEach(u => {
                 dd.innerHTML += `<label class="multi-select-item">
                     <input type="checkbox" value="${u.id}" ${hrSelectedTutors.has(u.id) ? 'checked' : ''} onchange="toggleTutor(${u.id})">
-                    <span>${u.display_name}</span>
+                    <span>${escapeHtml(u.display_name)}</span>
                 </label>`;
             });
 
             filt.innerHTML = '<option value="">All Tutors</option>';
             tutors.forEach(u => {
-                filt.innerHTML += `<option value="${u.id}">${u.display_name}</option>`;
+                filt.innerHTML += `<option value="${u.id}">${escapeHtml(u.display_name)}</option>`;
             });
             filt.value = curFilt;
         }
 
         async function loadHours() {
-            const res = await fetch('/api/admin/hours', {
-                headers: { 'Authorization': 'Bearer ' + token }
-            });
-            allHours = await res.json();
-            renderHours();
+            const container = document.getElementById('hoursList');
+            container.setAttribute('aria-busy', 'true');
+            try {
+                const res = await fetch('/api/admin/hours', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                if (res.status === 401 || res.status === 403) { logout(); return; }
+                if (!res.ok) throw new Error('Unable to load hours.');
+                allHours = await res.json();
+                renderHours();
+            } catch (error) {
+                showLoadError(container, error.message || 'Unable to load hours.', loadHours);
+            }
         }
 
         function renderHours() {
             const filter = document.getElementById('hrFilter').value;
             const filtered = filter ? allHours.filter(h => String(h.user_id) === filter) : allHours;
             const container = document.getElementById('hoursList');
+            container.removeAttribute('aria-busy');
 
             const totalHours = filtered.reduce((sum, h) => sum + h.hours, 0);
 
@@ -630,19 +901,19 @@
                 <span class="hours-total-value">${totalHours.toFixed(1)}</span>
             </div>`;
 
-            html += '<div class="users-table table-spaced"><div class="table-header table-hours">';
-            html += '<span>Tutor</span><span>Date</span><span>Hours</span><span>Description</span><span></span>';
+            html += '<div class="users-table table-spaced" role="table" aria-label="Logged hours"><div class="table-header table-hours" role="row">';
+            html += '<span role="columnheader">Tutor</span><span role="columnheader">Date</span><span role="columnheader">Hours</span><span role="columnheader">Description</span><span role="columnheader">Actions</span>';
             html += '</div>';
 
             filtered.forEach(h => {
-                html += `<div class="table-row table-hours" id="hour-row-${h.id}">
-                    <span class="user-name">${h.display_name}</span>
-                    <span>${formatDate(h.work_date)}</span>
-                    <span>${h.hours}</span>
-                    <span class="text-muted">${h.description || '—'}</span>
-                    <span class="inline-actions">
-                        <button class="btn btn-danger-ghost btn-secondary-ghost" onclick="editHour(${h.id})">Edit</button>
-                        <button class="btn btn-danger-ghost" onclick="deleteHour(${h.id})">Delete</button>
+                html += `<div class="table-row table-hours" role="row" id="hour-row-${h.id}">
+                    <span class="user-name" role="cell" data-label="Tutor">${escapeHtml(h.display_name)}</span>
+                    <span role="cell" data-label="Date">${formatDate(h.work_date)}</span>
+                    <span role="cell" data-label="Hours">${h.hours}</span>
+                    <span class="text-muted" role="cell" data-label="Description">${escapeHtml(h.description || '—')}</span>
+                    <span class="inline-actions" role="cell" data-label="Actions">
+                        <button type="button" class="btn btn-danger-ghost btn-secondary-ghost" onclick="editHour(${h.id})">Edit</button>
+                        <button type="button" class="btn btn-danger-ghost" onclick="deleteHour(${h.id})">Delete</button>
                     </span>
                 </div>`;
             });
@@ -656,8 +927,8 @@
             e.preventDefault();
             const msgEl = document.getElementById('hrMsg');
             if (hrSelectedTutors.size === 0) {
-                msgEl.className = 'msg msg-error';
-                msgEl.textContent = 'Please select at least one tutor';
+                showMsg(msgEl, false, 'Please select at least one tutor');
+                document.getElementById('hrTutorToggle').focus();
                 return;
             }
             msgEl.classList.add('is-hidden');
@@ -674,6 +945,7 @@
             document.getElementById('logHoursForm').reset();
             hrSelectedTutors.clear();
             updateTutorLabel();
+            announce('Hours logged.');
             loadHours();
         });
 
@@ -681,15 +953,16 @@
             const h = allHours.find(x => x.id === id);
             const row = document.getElementById('hour-row-' + id);
             row.innerHTML = `
-                <span class="user-name">${h.display_name}</span>
-                <span><input type="date" id="editDate-${id}" value="${h.work_date}" class="inline-edit-input"></span>
-                <span><input type="number" id="editHours-${id}" value="${h.hours}" min="0.25" step="0.25" class="inline-edit-input inline-edit-input-hours"></span>
-                <span><input type="text" id="editDesc-${id}" value="${h.description || ''}" class="inline-edit-input inline-edit-input-full"></span>
-                <span class="inline-actions">
-                    <button class="btn btn-danger-ghost btn-save-ghost" onclick="saveHour(${id})">Save</button>
-                    <button class="btn btn-danger-ghost btn-secondary-ghost" onclick="renderHours()">Cancel</button>
+                <span class="user-name" role="cell" data-label="Tutor">${escapeHtml(h.display_name)}</span>
+                <span role="cell" data-label="Date"><input type="date" id="editDate-${id}" value="${h.work_date}" class="inline-edit-input" aria-label="Work date"></span>
+                <span role="cell" data-label="Hours"><input type="number" id="editHours-${id}" value="${h.hours}" min="0.25" step="0.25" class="inline-edit-input inline-edit-input-hours" aria-label="Hours"></span>
+                <span role="cell" data-label="Description"><input type="text" id="editDesc-${id}" value="${escapeHtml(h.description || '')}" class="inline-edit-input inline-edit-input-full" aria-label="Description"></span>
+                <span class="inline-actions" role="cell" data-label="Actions">
+                    <button type="button" class="btn btn-danger-ghost btn-save-ghost" onclick="saveHour(${id})">Save</button>
+                    <button type="button" class="btn btn-danger-ghost btn-secondary-ghost" onclick="renderHours()">Cancel</button>
                 </span>
             `;
+            document.getElementById('editDate-' + id).focus();
         }
 
         async function saveHour(id) {
@@ -706,30 +979,39 @@
         }
 
         async function deleteHour(id) {
+            const entry = allHours.find(item => item.id === id);
+            if (!entry || !confirm(`Delete ${entry.hours} hours for ${entry.display_name} on ${formatDate(entry.work_date)}?`)) return;
             await fetch(`/api/admin/hours/${id}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': 'Bearer ' + token },
             });
+            announce('Hours entry deleted.');
             loadHours();
         }
 
         async function loadRoles() {
-            await fetchRoles();
             const container = document.getElementById('rolesList');
-            if (cachedRoles.length === 0) {
-                container.innerHTML = '<p class="text-muted">No roles defined yet.</p>';
-                return;
+            container.setAttribute('aria-busy', 'true');
+            try {
+                await fetchRoles();
+                container.removeAttribute('aria-busy');
+                if (cachedRoles.length === 0) {
+                    container.innerHTML = '<p class="text-muted">No roles defined yet.</p>';
+                    return;
+                }
+                let html = '<div class="roles-list">';
+                cachedRoles.forEach((role) => {
+                    const isDefault = role.name === 'Jr. Tutor';
+                    html += `<div class="role-item">
+                        <span class="role-name">${escapeHtml(role.name)}</span>
+                        <button type="button" class="btn btn-danger-ghost" ${isDefault ? 'disabled title="Default role cannot be deleted"' : `onclick="deleteRole(${role.id})"`}>Delete</button>
+                    </div>`;
+                });
+                html += '</div>';
+                container.innerHTML = html;
+            } catch {
+                showLoadError(container, 'Unable to load roles.', loadRoles);
             }
-            let html = '<div class="roles-list">';
-            cachedRoles.forEach((role) => {
-                const isDefault = role.name === 'Jr. Tutor';
-                html += `<div class="role-item">
-                    <span class="role-name">${escapeHtml(role.name)}</span>
-                    <button class="btn btn-danger-ghost" ${isDefault ? 'disabled title="Default role cannot be deleted"' : `onclick="deleteRole(${role.id})"`}>Delete</button>
-                </div>`;
-            });
-            html += '</div>';
-            container.innerHTML = html;
         }
 
         async function deleteRole(id) {
@@ -768,6 +1050,7 @@
             window.location.href = '/';
         }
 
+        loadEventLocations();
         loadAdminEvents();
     </script>
 </body>

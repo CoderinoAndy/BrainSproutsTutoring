@@ -1,64 +1,88 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BrainSprouts - Login</title>
+    <meta name="theme-color" content="#166534">
+    <meta name="description" content="Sign in to the BrainSprouts tutor management portal.">
+    <title>Sign in | BrainSprouts</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260726-2">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260901-5">
 </head>
 <body class="login-body">
-    <div class="login-container">
-        <div class="login-card">
+    <a class="skip-link" href="#main-content">Skip to sign in</a>
+    <main class="login-container" id="main-content" tabindex="-1">
+        <section class="login-card" aria-labelledby="login-title">
             <header class="login-header">
-                <img class="login-logo" src="/static/images/brainsprouts-logo.png" width="48" height="60">
-                <h1>BrainSprouts</h1>
+                <img class="login-logo" src="/static/images/brainsprouts-logo.png" width="48" height="60" alt="BrainSprouts logo">
+                <h1 id="login-title">BrainSprouts</h1>
+                <p class="sr-only">Sign in to manage your tutoring schedule.</p>
             </header>
 
-            <form id="loginForm">
+            <form id="loginForm" novalidate>
                 <div class="form-group">
                     <label for="username">Username</label>
-                    <input type="text" id="username" required placeholder="Username">
+                    <input type="text" id="username" name="username" required autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Username" aria-describedby="errorMsg">
                 </div>
                 <div class="form-group">
                     <label for="password">Password</label>
-                    <input type="password" id="password" required placeholder="Password">
+                    <input type="password" id="password" name="password" required autocomplete="current-password" placeholder="Password" aria-describedby="errorMsg">
                 </div>
-                <div id="errorMsg" class="error-msg is-hidden" role="alert"></div>
-                <button type="submit" class="btn btn-primary">Sign In</button>
+                <div id="errorMsg" class="error-msg is-hidden" role="alert" aria-live="assertive"></div>
+                <button type="submit" class="btn btn-primary" id="loginButton">Sign In</button>
             </form>
-        </div>
-    </div>
+        </section>
+    </main>
 
     <script>
         const token = localStorage.getItem('bs_token');
-        const user = JSON.parse(localStorage.getItem('bs_user'));
+        let user = null;
+        try { user = JSON.parse(localStorage.getItem('bs_user')); } catch { localStorage.removeItem('bs_user'); }
         if (token && user) {
             window.location.href = user.is_admin ? '/admin' : '/dashboard';
         }
 
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        const loginForm = document.getElementById('loginForm');
+        const loginButton = document.getElementById('loginButton');
+
+        loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const errEl = document.getElementById('errorMsg');
             errEl.classList.add('is-hidden');
+            errEl.textContent = '';
 
-            const res = await fetch('/api/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    username: document.getElementById('username').value,
-                    password: document.getElementById('password').value,
-                }),
-            });
-            const data = await res.json();
-            if (!res.ok) {
-                errEl.textContent = data.detail;
+            if (!loginForm.reportValidity()) return;
+
+            loginButton.disabled = true;
+            loginButton.textContent = 'Signing in…';
+            loginForm.setAttribute('aria-busy', 'true');
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: document.getElementById('username').value,
+                        password: document.getElementById('password').value,
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Unable to sign in.');
+
+                localStorage.setItem('bs_token', data.token);
+                localStorage.setItem('bs_user', JSON.stringify(data.user));
+                window.location.href = data.user.is_admin ? '/admin' : '/dashboard';
+            } catch (error) {
+                errEl.textContent = error.message || 'Unable to sign in. Check your connection and try again.';
                 errEl.classList.remove('is-hidden');
-                return;
+                document.getElementById('username').focus();
+            } finally {
+                loginButton.disabled = false;
+                loginButton.textContent = 'Sign In';
+                loginForm.removeAttribute('aria-busy');
             }
-            localStorage.setItem('bs_token', data.token);
-            localStorage.setItem('bs_user', JSON.stringify(data.user));
-            window.location.href = data.user.is_admin ? '/admin' : '/dashboard';
         });
     </script>
 </body>
