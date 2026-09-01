@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260901-6">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260901-7">
 </head>
 <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -539,8 +539,8 @@
                 }
                 const createdCount = data.created_count || repeatCount;
                 const message = createdCount === 1
-                    ? 'Event added. You can edit its time below.'
-                    : `${createdCount} weekly events added. You can edit each event's time below.`;
+                    ? 'Event added. You can edit its title, date, or time below.'
+                    : `${createdCount} weekly events added. You can edit each event's title, date, or time below.`;
                 showMsg(msgEl, true, message);
                 document.getElementById('evDate').value = '';
                 document.getElementById('evRepeatMode').value = 'once';
@@ -581,9 +581,11 @@
             const ev = allEvents.find(e => e.id === id);
             const row = document.getElementById('ev-row-' + id);
             row.innerHTML = `
-                <span class="user-name" role="cell" data-label="Date">${formatDate(ev.date)}</span>
+                <span role="cell" data-label="Date">
+                    <input type="date" id="editEvDate-${id}" value="${ev.date}" required class="inline-edit-input inline-edit-input-date" aria-label="Event date">
+                </span>
                 <span class="event-edit-details" role="cell" data-label="Title and location">
-                    <input type="text" id="editEvTitle-${id}" value="${escapeHtml(ev.title)}" class="inline-edit-input inline-edit-input-full" aria-label="Event title">
+                    <input type="text" id="editEvTitle-${id}" value="${escapeHtml(ev.title)}" required class="inline-edit-input inline-edit-input-full" aria-label="Event title">
                     <select id="editEvLocation-${id}" class="inline-edit-input inline-edit-select" aria-label="Event location">
                         ${locationOptions(ev.location_tag || '')}
                     </select>
@@ -607,6 +609,7 @@
                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
                 body: JSON.stringify({
                     title: document.getElementById('editEvTitle-' + id).value,
+                    event_date: document.getElementById('editEvDate-' + id).value,
                     start_time: document.getElementById('editEvStart-' + id).value,
                     end_time: document.getElementById('editEvEnd-' + id).value,
                     max_capacity: parseInt(document.getElementById('editEvCap-' + id).value),

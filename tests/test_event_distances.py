@@ -46,6 +46,13 @@ class EventLocationPersistenceTests(unittest.TestCase):
                 max_capacity INTEGER NOT NULL,
                 location_tag TEXT
             );
+            CREATE TABLE rsvps (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                event_date TEXT NOT NULL,
+                status TEXT NOT NULL,
+                UNIQUE(user_id, event_date)
+            );
             """
         )
         self.db = server.Database.__new__(server.Database)

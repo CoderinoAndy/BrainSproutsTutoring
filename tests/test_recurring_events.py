@@ -21,6 +21,13 @@ class RecurringEventCreationTests(unittest.TestCase):
                 max_capacity INTEGER NOT NULL,
                 location_tag TEXT
             );
+            CREATE TABLE rsvps (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                event_date TEXT NOT NULL,
+                status TEXT NOT NULL,
+                UNIQUE(user_id, event_date)
+            );
             """
         )
         self.db = server.Database.__new__(server.Database)
@@ -114,6 +121,68 @@ class RecurringEventCreationTests(unittest.TestCase):
             self.db.execute("SELECT COUNT(*) AS count FROM events").fetchone()["count"],
             0,
         )
+
+    def test_update_changes_title_date_and_time_and_keeps_rsvps(self):
+        server.create_event(self.event_body(), self.db, {})
+        event = self.db.execute("SELECT * FROM events").fetchone()
+        self.db.execute(
+            "INSERT INTO rsvps (user_id, event_date, status) VALUES (?, ?, ?)",
+            (42, event["event_date"], "yes"),
+        )
+        self.db.commit()
+
+        server.update_event(
+            event["id"],
+            server.EventBody(
+                title="Homework Club",
+                event_date="2026-09-10",
+                start_time="17:15",
+                end_time="18:45",
+                max_capacity=15,
+                location_tag="Aurora Public Library",
+            ),
+            self.db,
+            {},
+        )
+
+        updated_event = self.db.execute("SELECT * FROM events").fetchone()
+        self.assertEqual(updated_event["title"], "Homework Club")
+        self.assertEqual(updated_event["event_date"], "2026-09-10")
+        self.assertEqual(updated_event["start_time"], "17:15")
+        self.assertEqual(updated_event["end_time"], "18:45")
+        rsvp = self.db.execute("SELECT * FROM rsvps").fetchone()
+        self.assertEqual(rsvp["event_date"], "2026-09-10")
+
+    def test_update_rejects_a_date_used_by_another_event(self):
+        server.create_event(self.event_body(), self.db, {})
+        server.create_event(
+            self.event_body(event_date="2026-09-16"), self.db, {}
+        )
+        first_event = self.db.execute(
+            "SELECT * FROM events WHERE event_date = ?", ("2026-09-09",)
+        ).fetchone()
+
+        with self.assertRaises(HTTPException) as raised:
+            server.update_event(
+                first_event["id"],
+                server.EventBody(
+                    title="Homework Club",
+                    event_date="2026-09-16",
+                    start_time="17:15",
+                    end_time="18:45",
+                    max_capacity=15,
+                    location_tag="Aurora Public Library",
+                ),
+                self.db,
+                {},
+            )
+
+        self.assertEqual(raised.exception.status_code, 409)
+        unchanged_event = self.db.execute(
+            "SELECT * FROM events WHERE id = ?", (first_event["id"],)
+        ).fetchone()
+        self.assertEqual(unchanged_event["event_date"], "2026-09-09")
+        self.assertEqual(unchanged_event["title"], "Tutoring Session")
 
 
 if __name__ == "__main__":

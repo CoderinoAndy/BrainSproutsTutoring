@@ -850,6 +850,11 @@ textarea {
     width: 100%;
 }
 
+.inline-edit-input-date {
+    width: 100%;
+    min-width: 130px;
+}
+
 .inline-edit-input-time {
     padding: 4px 6px;
 }

@@ -454,6 +454,7 @@ class RoleOrderBody(BaseModel):
 
 class EventBody(BaseModel):
     title: str
+    event_date: str | None = None
     start_time: str
     end_time: str
     max_capacity: int = 15
@@ -718,13 +719,18 @@ def validated_event_values(data: EventBody) -> tuple[str, str, str]:
     return title, start_time, end_time
 
 
+def validated_event_date(event_date: str) -> str:
+    try:
+        parsed_date = datetime.strptime(event_date.strip(), "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(400, "Event date must use YYYY-MM-DD format")
+    return parsed_date.strftime("%Y-%m-%d")
+
+
 def weekly_event_dates(event_date: str, repeat_count: int) -> list[str]:
     if repeat_count < 1 or repeat_count > 52:
         raise HTTPException(400, "Repeat count must be between 1 and 52")
-    try:
-        first_date = datetime.strptime(event_date.strip(), "%Y-%m-%d")
-    except ValueError:
-        raise HTTPException(400, "Event date must use YYYY-MM-DD format")
+    first_date = datetime.strptime(validated_event_date(event_date), "%Y-%m-%d")
     return [
         (first_date + timedelta(weeks=week)).strftime("%Y-%m-%d")
         for week in range(repeat_count)
@@ -775,20 +781,41 @@ def update_event(event_id: int, data: EventBody, db: Db, _admin: Admin):
     if not event:
         raise HTTPException(404, "Event not found")
     title, start_time, end_time = validated_event_values(data)
-    location_tag = normalize_location_tag(data.location_tag)
-    db.execute(
-        "UPDATE events SET title = ?, start_time = ?, end_time = ?, "
-        "max_capacity = ?, location_tag = ? WHERE id = ?",
-        (
-            title,
-            start_time,
-            end_time,
-            data.max_capacity,
-            location_tag,
-            event_id,
-        ),
+    event_date = (
+        validated_event_date(data.event_date)
+        if data.event_date is not None
+        else event["event_date"]
     )
-    db.commit()
+    conflicting_event = db.execute(
+        "SELECT id FROM events WHERE event_date = ? AND id != ?",
+        (event_date, event_id),
+    ).fetchone()
+    if conflicting_event:
+        raise HTTPException(409, f"An event already exists on {event_date}")
+    location_tag = normalize_location_tag(data.location_tag)
+    try:
+        db.execute(
+            "UPDATE events SET title = ?, event_date = ?, start_time = ?, "
+            "end_time = ?, max_capacity = ?, location_tag = ? WHERE id = ?",
+            (
+                title,
+                event_date,
+                start_time,
+                end_time,
+                data.max_capacity,
+                location_tag,
+                event_id,
+            ),
+        )
+        if event_date != event["event_date"]:
+            db.execute(
+                "UPDATE rsvps SET event_date = ? WHERE event_date = ?",
+                (event_date, event["event_date"]),
+            )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
 
 @app.delete("/api/admin/events/{event_id}")
