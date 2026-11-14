@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=20261114-3">
+    <link rel="stylesheet" href="/static/css/style.css?v=20261114-6">
 </head>
 <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -175,7 +175,16 @@
                                         <span id="hrTutorLabel">Select tutors...</span>
                                         <span aria-hidden="true">▾</span>
                                     </button>
-                                    <div class="multi-select-dropdown" id="hrTutorDropdown" role="group" aria-label="Tutor choices"></div>
+                                    <div class="multi-select-dropdown" id="hrTutorDropdown" role="group" aria-label="Tutor choices">
+                                        <div class="multi-select-search">
+                                            <input type="search" id="hrTutorSearch" placeholder="Search tutors..." autocomplete="off" spellcheck="false" aria-label="Search tutors" aria-controls="hrTutorOptions">
+                                        </div>
+                                        <button type="button" class="multi-select-item multi-select-item-button" id="hrSelectAll" onclick="selectAllTutors()">
+                                            <span class="select-all-label" id="hrSelectAllLabel">Select All</span>
+                                        </button>
+                                        <div id="hrTutorOptions"></div>
+                                        <p class="multi-select-empty" id="hrTutorNoMatch" hidden>No tutors match your search.</p>
+                                    </div>
                                 </div>
                             </div>
                             <div class="form-group">
@@ -716,7 +725,12 @@
                         ${availableRoles.map(role => `<option value="${escapeHtml(role.name)}" ${u.executive_title === role.name ? 'selected' : ''}>${escapeHtml(role.name)}</option>`).join('')}
                         </select>` : '';
                     html += `<div class="table-row table-5col" role="row">
-                        <span class="user-name" role="cell" data-label="Name">${escapeHtml(u.display_name)} ${u.is_admin ? '<span class="nav-badge">Admin</span>' : ''}</span>
+                        <span class="user-name" role="cell" data-label="Name">
+                            <input type="text" class="inline-edit-input name-edit-input" value="${escapeHtml(u.display_name)}" data-user-id="${u.id}" data-saved="${escapeHtml(u.display_name)}"
+                                required maxlength="100" autocomplete="off" spellcheck="false" aria-label="Name for ${escapeHtml(u.username)}"
+                                onchange="updateDisplayName(this)" onkeydown="nameEditKeydown(event, this)">
+                            ${u.is_admin ? '<span class="nav-badge">Admin</span>' : ''}
+                        </span>
                         <span class="text-muted" role="cell" data-label="Username">${escapeHtml(u.username)}</span>
                         <span role="cell" data-label="Executive Title">${titleSelect || escapeHtml(u.executive_title || '')}</span>
                         <span class="text-muted" role="cell" data-label="Created">${String(u.created_at).split(/[ T]/)[0]}</span>
@@ -737,6 +751,50 @@
                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
                 body: JSON.stringify({ executive_title: title }),
             });
+        }
+
+        function nameEditKeydown(event, input) {
+            if (event.key === 'Enter') {
+                input.blur();
+            } else if (event.key === 'Escape') {
+                input.value = input.dataset.saved;
+                input.classList.remove('is-error');
+                input.blur();
+            }
+        }
+
+        async function updateDisplayName(input) {
+            const userId = Number(input.dataset.userId);
+            const previous = input.dataset.saved;
+            const newName = input.value.trim();
+            if (!newName) {
+                input.value = previous;
+                announce('Name cannot be empty, so it was left unchanged.');
+                return;
+            }
+            input.classList.remove('is-saved', 'is-error');
+            input.disabled = true;
+            try {
+                const res = await fetch(`/api/admin/users/${userId}/display-name`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                    body: JSON.stringify({ display_name: newName }),
+                });
+                if (res.status === 401 || res.status === 403) { logout(); return; }
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'The name could not be saved.');
+                input.value = data.display_name;
+                input.dataset.saved = data.display_name;
+                const tutor = allUsers.find(item => item.id === userId);
+                if (tutor) tutor.display_name = data.display_name;
+                input.classList.add('is-saved');
+                announce(`Renamed ${previous} to ${data.display_name}.`);
+            } catch (error) {
+                input.classList.add('is-error');
+                alert(error.message || 'The name could not be saved.');
+            } finally {
+                input.disabled = false;
+            }
         }
 
         document.getElementById('createUserForm').addEventListener('submit', async (e) => {
@@ -939,7 +997,41 @@
             const toggle = document.getElementById('hrTutorToggle');
             const isOpen = dd.classList.toggle('open');
             toggle.setAttribute('aria-expanded', String(isOpen));
+            if (isOpen) {
+                // Start each search fresh so no tutor stays hidden from a previous one.
+                const search = document.getElementById('hrTutorSearch');
+                search.value = '';
+                filterTutorOptions();
+                search.focus();
+            }
         }
+
+        function visibleTutorCheckboxes() {
+            return Array.from(document.querySelectorAll('#hrTutorOptions .multi-select-item:not([hidden]) input[type=checkbox]'));
+        }
+
+        function filterTutorOptions() {
+            const query = document.getElementById('hrTutorSearch').value.trim().toLowerCase();
+            let matches = 0;
+            document.querySelectorAll('#hrTutorOptions .multi-select-item').forEach(item => {
+                const isMatch = !query || item.dataset.search.includes(query);
+                item.hidden = !isMatch;
+                if (isMatch) matches++;
+            });
+            const hasTutors = document.querySelectorAll('#hrTutorOptions .multi-select-item').length > 0;
+            document.getElementById('hrTutorNoMatch').hidden = matches > 0 || !hasTutors;
+            document.getElementById('hrSelectAll').hidden = matches === 0;
+            document.getElementById('hrSelectAllLabel').textContent = query ? `Select all ${matches} matching` : 'Select All';
+        }
+
+        document.getElementById('hrTutorSearch').addEventListener('input', filterTutorOptions);
+        document.getElementById('hrTutorSearch').addEventListener('keydown', (event) => {
+            // Enter would otherwise submit the Log Hours form. With exactly one match, tick that tutor instead.
+            if (event.key !== 'Enter') return;
+            event.preventDefault();
+            const visible = visibleTutorCheckboxes();
+            if (visible.length === 1) visible[0].click();
+        });
 
         function closeMultiSelect() {
             document.getElementById('hrTutorDropdown').classList.remove('open');
@@ -972,16 +1064,16 @@
             else label.textContent = hrSelectedTutors.size + ' tutor' + (hrSelectedTutors.size !== 1 ? 's' : '') + ' selected';
         }
 
+        // Acts only on the tutors the search is showing, so "Select All" can't tick hidden names.
         function selectAllTutors() {
-            const dd = document.getElementById('hrTutorDropdown');
-            const cbs = dd.querySelectorAll('input[type=checkbox]');
-            const allSelected = hrSelectedTutors.size === cbs.length;
-            if (allSelected) {
-                hrSelectedTutors.clear();
-                cbs.forEach(cb => cb.checked = false);
-            } else {
-                cbs.forEach(cb => { cb.checked = true; hrSelectedTutors.add(parseInt(cb.value)); });
-            }
+            const cbs = visibleTutorCheckboxes();
+            const allSelected = cbs.length > 0 && cbs.every(cb => cb.checked);
+            cbs.forEach(cb => {
+                const id = parseInt(cb.value, 10);
+                cb.checked = !allSelected;
+                if (allSelected) hrSelectedTutors.delete(id);
+                else hrSelectedTutors.add(id);
+            });
             updateTutorLabel();
         }
 
@@ -992,19 +1084,16 @@
             const users = await res.json();
             const tutors = users.filter(u => !u.is_admin);
             hourTutors = tutors;
-            const dd = document.getElementById('hrTutorDropdown');
+            const options = document.getElementById('hrTutorOptions');
             const filt = document.getElementById('hrFilter');
             const curFilt = filt.value;
 
-            dd.innerHTML = `<button type="button" class="multi-select-item multi-select-item-button" onclick="selectAllTutors()">
-                <span class="select-all-label">Select All</span>
-            </button>`;
-            tutors.forEach(u => {
-                dd.innerHTML += `<label class="multi-select-item">
+            // Searchable by display name or username.
+            options.innerHTML = tutors.map(u => `<label class="multi-select-item" data-search="${escapeHtml(`${u.display_name} ${u.username}`.toLowerCase())}">
                     <input type="checkbox" value="${u.id}" ${hrSelectedTutors.has(u.id) ? 'checked' : ''} onchange="toggleTutor(${u.id})">
                     <span>${escapeHtml(u.display_name)}</span>
-                </label>`;
-            });
+                </label>`).join('') || '<p class="multi-select-empty">No tutors yet.</p>';
+            filterTutorOptions();
 
             filt.innerHTML = '<option value="">All Tutors</option>';
             tutors.forEach(u => {
@@ -1059,11 +1148,6 @@
                 row.total += entry.hours;
             });
 
-            if (rows.size === 0) {
-                container.innerHTML = '<p class="text-muted hours-totals-empty">No tutors yet.</p>';
-                return;
-            }
-
             // Entries logged before locations existed get their own column until they are assigned.
             const columns = hourLocations.map(location => ({ key: location, label: location }));
             if (allHours.some(entry => !hourLocations.includes(entry.location))) {
@@ -1079,6 +1163,11 @@
             let html = '<div class="hours-totals-scroll"><table class="hours-totals-table"><thead><tr><th scope="col">Tutor</th>';
             html += columns.map(column => `<th scope="col">${escapeHtml(column.label)}</th>`).join('');
             html += '<th scope="col">Total</th></tr></thead><tbody>';
+
+            // Keep the table (and its location columns) on screen even before any tutors exist.
+            if (sortedRows.length === 0) {
+                html += `<tr><td class="hours-totals-empty-row" colspan="${columns.length + 2}">No tutors yet. Tutors appear here once they have an account.</td></tr>`;
+            }
 
             sortedRows.forEach(row => {
                 const isSelected = String(row.id) === selectedId;
@@ -1176,6 +1265,7 @@
             document.getElementById('logHoursForm').reset();
             hrSelectedTutors.clear();
             updateTutorLabel();
+            filterTutorOptions();
             announce('Hours logged.');
             loadHours();
         });

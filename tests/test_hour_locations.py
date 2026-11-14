@@ -45,10 +45,10 @@ class HourLocationTests(unittest.TestCase):
         }
         server.create_hours(server.LogHoursBody(**body), self.db, {})
 
-    def test_the_three_hour_locations_are_offered(self):
+    def test_the_hour_locations_are_offered(self):
         self.assertEqual(
             server.hour_locations({}),
-            ["Aurora Public Library", "Hartman P.S.", "Northern Lights P.S."],
+            ["Aurora Public Library", "Hartman P.S.", "Northern Lights P.S.", "CICS"],
         )
 
     def test_logged_hours_keep_location_and_description(self):

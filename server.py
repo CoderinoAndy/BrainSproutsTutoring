@@ -40,6 +40,7 @@ HOUR_LOCATIONS = [
     "Aurora Public Library",
     "Hartman P.S.",
     "Northern Lights P.S.",
+    "CICS",
 ]
 
 HIGH_SCHOOLS = [
@@ -490,6 +491,23 @@ class TitleBody(BaseModel):
     executive_title: str
 
 
+class DisplayNameBody(BaseModel):
+    display_name: str
+
+
+DISPLAY_NAME_MAX_LENGTH = 100
+
+
+def clean_display_name(display_name: str) -> str:
+    # Collapse stray spaces so "  Andy   Yu " is stored as "Andy Yu".
+    cleaned = " ".join(display_name.split())
+    if not cleaned:
+        raise HTTPException(400, "Name cannot be empty")
+    if len(cleaned) > DISPLAY_NAME_MAX_LENGTH:
+        raise HTTPException(400, f"Name must be {DISPLAY_NAME_MAX_LENGTH} characters or fewer")
+    return cleaned
+
+
 class RoleBody(BaseModel):
     name: str
 
@@ -742,6 +760,16 @@ def update_title(user_id: int, data: TitleBody, db: Db, _admin: Admin):
         "UPDATE users SET executive_title = ? WHERE id = ?", (title, user_id)
     )
     db.commit()
+
+
+@app.put("/api/admin/users/{user_id}/display-name")
+def update_display_name(user_id: int, data: DisplayNameBody, db: Db, _admin: Admin):
+    display_name = clean_display_name(data.display_name)
+    if not db.execute("SELECT id FROM users WHERE id = ?", (user_id,)).fetchone():
+        raise HTTPException(404, "Tutor not found")
+    db.execute("UPDATE users SET display_name = ? WHERE id = ?", (display_name, user_id))
+    db.commit()
+    return {"display_name": display_name}
 
 
 @app.get("/api/roles")

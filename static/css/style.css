@@ -1041,6 +1041,12 @@ textarea {
 
 .table-5col {
     grid-template-columns: 1.4fr 1fr 1fr 0.6fr 80px;
+    column-gap: 12px;
+}
+
+.user-name .nav-badge {
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .table-events {
@@ -1239,6 +1245,65 @@ textarea {
 
 .select-all-label {
     font-weight: 600;
+}
+
+/* .multi-select-item sets display:flex, which would otherwise override [hidden]. */
+.multi-select-item[hidden] {
+    display: none;
+}
+
+.multi-select-search {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 8px;
+    background: white;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.multi-select-search input {
+    padding: 8px 12px;
+}
+
+.multi-select-empty {
+    padding: 10px 14px;
+    color: var(--gray-500);
+    font-size: 13px;
+}
+
+/* Tutor names read as plain text until hovered or focused, then become an obvious text box. */
+.name-edit-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+    padding: 4px 8px;
+    margin-left: -9px;
+    border-color: transparent;
+    background: transparent;
+    color: var(--gray-900);
+    font-weight: 600;
+    transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
+}
+
+.name-edit-input:hover {
+    border-color: var(--gray-300);
+    background: white;
+}
+
+.name-edit-input:focus {
+    border-color: var(--green-500);
+    background: white;
+    box-shadow: 0 0 0 3px rgba(22,163,74,0.12);
+    outline: none;
+}
+
+.name-edit-input.is-saved {
+    border-color: var(--green-500);
+}
+
+.name-edit-input.is-error {
+    border-color: var(--red-500);
+    background: white;
 }
 
 .dashboard-hours {
@@ -1444,6 +1509,12 @@ textarea {
 .hours-totals-name:hover,
 .hours-totals-name[aria-pressed="true"] {
     color: var(--green-700);
+}
+
+.hours-totals-table .hours-totals-empty-row {
+    padding: 14px 16px;
+    color: var(--gray-500);
+    text-align: left;
 }
 
 .hours-totals-table .hours-totals-zero {
@@ -2013,6 +2084,13 @@ textarea {
     .table-row .inline-edit-select {
         min-width: 0;
         width: 100%;
+    }
+
+    /* Touch screens have no hover, so show the name box as editable from the start. */
+    .name-edit-input {
+        margin-left: 0;
+        border-color: var(--gray-300);
+        background: white;
     }
 
     /* These cells stack two values, so the label sits beside them in its own column. */
