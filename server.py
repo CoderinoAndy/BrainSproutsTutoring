@@ -34,6 +34,14 @@ EVENT_LOCATIONS = {
     ),
 }
 
+# Places where tutoring hours can be logged. Kept separate from EVENT_LOCATIONS
+# because hours are only tracked for these three sites.
+HOUR_LOCATIONS = [
+    "Aurora Public Library",
+    "Hartman P.S.",
+    "Northern Lights P.S.",
+]
+
 HIGH_SCHOOLS = [
     (
         "Denison High School",
@@ -142,7 +150,9 @@ class Database:
         if USE_POSTGRES:
             self.connection = psycopg2.connect(DATABASE_URL)
         else:
-            self.connection = sqlite3.connect(DB_PATH)
+            # Each request gets its own connection, but FastAPI may open it in one
+            # worker thread and run the endpoint in another when requests overlap.
+            self.connection = sqlite3.connect(DB_PATH, check_same_thread=False)
             self.connection.row_factory = dict_factory
 
     def execute(self, sql, params=()):
@@ -190,6 +200,7 @@ def init_db():
                     display_name TEXT NOT NULL,
                     is_admin BOOLEAN DEFAULT FALSE,
                     executive_title TEXT NOT NULL DEFAULT 'Jr. Tutor',
+                    is_approved BOOLEAN NOT NULL DEFAULT TRUE,
                     created_at TIMESTAMP DEFAULT NOW()
                 )
                 """,
@@ -230,6 +241,7 @@ def init_db():
                     work_date TEXT NOT NULL,
                     hours REAL NOT NULL,
                     description TEXT NOT NULL DEFAULT '',
+                    location TEXT,
                     created_at TIMESTAMP DEFAULT NOW()
                 )
                 """,
@@ -247,9 +259,15 @@ def init_db():
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS executive_title "
                 "TEXT NOT NULL DEFAULT 'Jr. Tutor'"
             )
+            # Existing accounts predate self sign-up, so they default to approved.
+            db.execute(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_approved "
+                "BOOLEAN NOT NULL DEFAULT TRUE"
+            )
             db.execute(
                 "ALTER TABLE events ADD COLUMN IF NOT EXISTS location_tag TEXT"
             )
+            db.execute("ALTER TABLE hours ADD COLUMN IF NOT EXISTS location TEXT")
         else:
             db.connection.executescript("""
                 CREATE TABLE IF NOT EXISTS users (
@@ -259,6 +277,7 @@ def init_db():
                     display_name TEXT NOT NULL,
                     is_admin INTEGER DEFAULT 0,
                     executive_title TEXT NOT NULL DEFAULT 'Jr. Tutor',
+                    is_approved INTEGER NOT NULL DEFAULT 1,
                     created_at TEXT DEFAULT (datetime('now'))
                 );
                 CREATE TABLE IF NOT EXISTS events (
@@ -291,6 +310,7 @@ def init_db():
                     work_date TEXT NOT NULL,
                     hours REAL NOT NULL,
                     description TEXT NOT NULL DEFAULT '',
+                    location TEXT,
                     created_at TEXT DEFAULT (datetime('now'))
                 );
                 CREATE TABLE IF NOT EXISTS roles (
@@ -307,11 +327,22 @@ def init_db():
                     "ALTER TABLE users ADD COLUMN executive_title "
                     "TEXT NOT NULL DEFAULT 'Jr. Tutor'"
                 )
+            if "is_approved" not in user_columns:
+                # Existing accounts predate self sign-up, so they default to approved.
+                db.execute(
+                    "ALTER TABLE users ADD COLUMN is_approved "
+                    "INTEGER NOT NULL DEFAULT 1"
+                )
             event_columns = {
                 row["name"] for row in db.execute("PRAGMA table_info(events)").fetchall()
             }
             if "location_tag" not in event_columns:
                 db.execute("ALTER TABLE events ADD COLUMN location_tag TEXT")
+            hour_columns = {
+                row["name"] for row in db.execute("PRAGMA table_info(hours)").fetchall()
+            }
+            if "location" not in hour_columns:
+                db.execute("ALTER TABLE hours ADD COLUMN location TEXT")
 
         if not db.execute(
             "SELECT id FROM users WHERE username = ?", ("AndyAlbert",)
@@ -364,6 +395,17 @@ def normalize_location_tag(location_tag: str | None) -> str | None:
         return None
     if normalized not in EVENT_LOCATIONS:
         raise HTTPException(400, "Unknown event location")
+    return normalized
+
+
+def normalize_hour_location(location: str | None, required: bool = False) -> str | None:
+    normalized = (location or "").strip()
+    if not normalized:
+        if required:
+            raise HTTPException(400, "Choose a location for these hours")
+        return None
+    if normalized not in HOUR_LOCATIONS:
+        raise HTTPException(400, "Unknown hours location")
     return normalized
 
 
@@ -431,6 +473,10 @@ class UserBody(LoginBody):
     display_name: str
 
 
+class SignupBody(LoginBody):
+    confirm_password: str
+
+
 class PasswordVerificationBody(BaseModel):
     current_password: str
 
@@ -480,6 +526,7 @@ class HoursBody(BaseModel):
     work_date: str
     hours: float
     description: str = ""
+    location: str | None = None
 
 
 class LogHoursBody(HoursBody):
@@ -532,6 +579,11 @@ def login_page():
     return FileResponse(BASE_DIR / "templates" / "login.html")
 
 
+@app.get("/signup")
+def signup_page():
+    return FileResponse(BASE_DIR / "templates" / "signup.html")
+
+
 @app.get("/dashboard")
 def dashboard_page():
     return FileResponse(BASE_DIR / "templates" / "dashboard.html")
@@ -547,11 +599,44 @@ def login(data: LoginBody, db: Db):
     user = db.execute("SELECT * FROM users WHERE username = ?", (data.username.strip(),)).fetchone()
     if not user or not password_matches(data.password, user["password_hash"]):
         raise HTTPException(401, "Invalid credentials")
+    if not user["is_approved"]:
+        raise HTTPException(
+            403, "Your account is still waiting for approval from a cofounder."
+        )
     token = jwt.encode({"user_id": user["id"], "is_admin": bool(user["is_admin"]),
         "exp": datetime.utcnow() + timedelta(hours=12)}, SECRET_KEY, algorithm="HS256")
     return {"token": token, "user": {"id": user["id"], "username": user["username"],
         "display_name": user["display_name"], "is_admin": bool(user["is_admin"]),
         "executive_title": user["executive_title"]}}
+
+
+@app.post("/api/signup", status_code=201)
+def signup(data: SignupBody, db: Db):
+    """Create a self-registered account that cannot sign in until an admin approves it."""
+    username = data.username.strip()
+    if not 3 <= len(username) <= 40:
+        raise HTTPException(400, "Username must be between 3 and 40 characters")
+    if data.password != data.confirm_password:
+        raise HTTPException(400, "Passwords do not match")
+    if len(data.password) < 6:
+        raise HTTPException(400, "Password must be at least 6 characters")
+    password_bytes = data.password.encode()
+    if len(password_bytes) > 72:
+        raise HTTPException(400, "Password must be 72 bytes or fewer")
+    # Compared case-insensitively so nobody can request a look-alike of an existing name.
+    if db.execute(
+        "SELECT id FROM users WHERE LOWER(username) = LOWER(?)", (username,)
+    ).fetchone():
+        raise HTTPException(409, "That username is already taken")
+
+    password_hash = bcrypt.hashpw(password_bytes, bcrypt.gensalt()).decode()
+    db.execute(
+        "INSERT INTO users (username, password_hash, display_name, is_approved) "
+        "VALUES (?, ?, ?, ?)",
+        (username, password_hash, username, False),
+    )
+    db.commit()
+    return {"message": "Account created. A cofounder needs to approve it before you can sign in."}
 
 
 @app.post("/api/me/password/verify")
@@ -586,7 +671,47 @@ def change_password(data: ChangePasswordBody, db: Db, auth: User):
 
 @app.get("/api/admin/users")
 def list_users(db: Db, _admin: Admin):
-    return db.execute("SELECT id, username, display_name, is_admin, executive_title, created_at FROM users ORDER BY display_name").fetchall()
+    return db.execute(
+        "SELECT id, username, display_name, is_admin, executive_title, created_at "
+        "FROM users WHERE is_approved = ? ORDER BY display_name",
+        (True,),
+    ).fetchall()
+
+
+@app.get("/api/admin/pending-users")
+def list_pending_users(db: Db, _admin: Admin):
+    return db.execute(
+        "SELECT id, username, created_at FROM users "
+        "WHERE is_approved = ? ORDER BY created_at, id",
+        (False,),
+    ).fetchall()
+
+
+def pending_user(db: Database, user_id: int) -> dict:
+    user = db.execute(
+        "SELECT id, username FROM users WHERE id = ? AND is_approved = ?",
+        (user_id, False),
+    ).fetchone()
+    if not user:
+        raise HTTPException(404, "This sign-up request no longer exists")
+    return user
+
+
+@app.post("/api/admin/pending-users/{user_id}/approve")
+def approve_pending_user(user_id: int, db: Db, _admin: Admin):
+    user = pending_user(db, user_id)
+    db.execute("UPDATE users SET is_approved = ? WHERE id = ?", (True, user["id"]))
+    db.commit()
+    return {"message": f"{user['username']} was approved"}
+
+
+@app.delete("/api/admin/pending-users/{user_id}")
+def deny_pending_user(user_id: int, db: Db, _admin: Admin):
+    # Denying removes the request entirely, which also frees up the username.
+    user = pending_user(db, user_id)
+    db.execute("DELETE FROM users WHERE id = ?", (user["id"],))
+    db.commit()
+    return {"message": f"{user['username']} was denied"}
 
 
 @app.post("/api/admin/users")
@@ -629,6 +754,11 @@ def list_roles(db: Db, _user: User):
 @app.get("/api/event-locations")
 def event_locations(_user: User):
     return list(EVENT_LOCATIONS)
+
+
+@app.get("/api/hour-locations")
+def hour_locations(_user: User):
+    return HOUR_LOCATIONS
 
 
 @app.post("/api/admin/roles", status_code=201)
@@ -882,27 +1012,30 @@ def me(db: Db, auth: User):
 
 @app.get("/api/hours")
 def my_hours(db: Db, user: User):
-    return db.execute("SELECT id, work_date, hours, description, created_at FROM hours WHERE user_id = ? ORDER BY work_date DESC",
+    return db.execute("SELECT id, work_date, hours, description, location, created_at FROM hours WHERE user_id = ? ORDER BY work_date DESC",
                       (user["user_id"],)).fetchall()
 
 
 @app.get("/api/admin/hours")
 def all_hours(db: Db, _admin: Admin):
-    return db.execute("""SELECT h.id, h.user_id, h.work_date, h.hours, h.description, h.created_at, u.display_name
+    return db.execute("""SELECT h.id, h.user_id, h.work_date, h.hours, h.description, h.location, h.created_at, u.display_name
         FROM hours h JOIN users u ON h.user_id = u.id ORDER BY h.work_date DESC, u.display_name""").fetchall()
 
 
 @app.post("/api/admin/hours")
 def create_hours(data: LogHoursBody, db: Db, _admin: Admin):
-    db.executemany("INSERT INTO hours (user_id, work_date, hours, description) VALUES (?, ?, ?, ?)",
-        [(user_id, data.work_date, data.hours, data.description.strip()) for user_id in data.user_ids])
+    location = normalize_hour_location(data.location, required=True)
+    db.executemany("INSERT INTO hours (user_id, work_date, hours, description, location) VALUES (?, ?, ?, ?, ?)",
+        [(user_id, data.work_date, data.hours, data.description.strip(), location) for user_id in data.user_ids])
     db.commit()
 
 
 @app.put("/api/admin/hours/{hour_id}")
 def update_hours(hour_id: int, data: HoursBody, db: Db, _admin: Admin):
-    db.execute("UPDATE hours SET work_date = ?, hours = ?, description = ? WHERE id = ?",
-               (data.work_date, data.hours, data.description.strip(), hour_id))
+    # Entries logged before locations existed may stay unassigned when edited.
+    location = normalize_hour_location(data.location)
+    db.execute("UPDATE hours SET work_date = ?, hours = ?, description = ?, location = ? WHERE id = ?",
+               (data.work_date, data.hours, data.description.strip(), location, hour_id))
     db.commit()
 
 

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#166534">
+    <meta name="description" content="Create an account for the BrainSprouts tutor management portal.">
+    <title>Sign up | BrainSprouts</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css?v=20261114-2">
+</head>
+<body class="login-body">
+    <a class="skip-link" href="#main-content">Skip to sign up</a>
+    <main class="login-container" id="main-content" tabindex="-1">
+        <section class="login-card" aria-labelledby="signup-title">
+            <header class="login-header">
+                <img class="login-logo" src="/static/images/brainsprouts-logo.png" width="48" height="60" alt="BrainSprouts logo">
+                <h1 id="signup-title">Create an account</h1>
+            </header>
+
+            <form id="signupForm" novalidate>
+                <p class="signup-notice" id="usernameNotice">The cofounders should be able to identify you from this username, so use your real name (for example, AndyYu).</p>
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required minlength="3" maxlength="40" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Username" aria-describedby="usernameNotice errorMsg">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required minlength="6" autocomplete="new-password" placeholder="At least 6 characters" aria-describedby="errorMsg">
+                </div>
+                <div class="form-group">
+                    <label for="confirmPassword">Confirm password</label>
+                    <input type="password" id="confirmPassword" name="confirm_password" required minlength="6" autocomplete="new-password" placeholder="Re-enter your password" aria-describedby="errorMsg">
+                </div>
+                <div id="errorMsg" class="error-msg is-hidden" role="alert" aria-live="assertive"></div>
+                <button type="submit" class="btn btn-primary" id="signupButton">Sign Up</button>
+            </form>
+
+            <div id="signupSuccess" class="signup-success" role="status" tabindex="-1" hidden>
+                <h2>Request sent!</h2>
+                <p>Your account <strong id="createdUsername"></strong> has been created. You'll be able to sign in once a cofounder approves it.</p>
+            </div>
+
+            <p class="login-alt"><span id="loginAltPrompt">Already have an account?</span> <a href="/">Sign in</a></p>
+        </section>
+    </main>
+
+    <script>
+        const signupForm = document.getElementById('signupForm');
+        const signupButton = document.getElementById('signupButton');
+        const errEl = document.getElementById('errorMsg');
+
+        function showError(message, field) {
+            errEl.textContent = message;
+            errEl.classList.remove('is-hidden');
+            if (field) field.focus();
+        }
+
+        signupForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errEl.classList.add('is-hidden');
+            errEl.textContent = '';
+
+            const usernameInput = document.getElementById('username');
+            const passwordInput = document.getElementById('password');
+            const confirmInput = document.getElementById('confirmPassword');
+            const username = usernameInput.value.trim();
+
+            if (username.length < 3) {
+                showError('Username must be at least 3 characters.', usernameInput);
+                return;
+            }
+            if (passwordInput.value.length < 6) {
+                showError('Password must be at least 6 characters.', passwordInput);
+                return;
+            }
+            if (passwordInput.value !== confirmInput.value) {
+                showError('Passwords do not match.', confirmInput);
+                return;
+            }
+
+            signupButton.disabled = true;
+            signupButton.textContent = 'Creating account…';
+            signupForm.setAttribute('aria-busy', 'true');
+
+            try {
+                const res = await fetch('/api/signup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username,
+                        password: passwordInput.value,
+                        confirm_password: confirmInput.value,
+                    }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    throw new Error(typeof data.detail === 'string' ? data.detail : 'Unable to create your account.');
+                }
+
+                signupForm.hidden = true;
+                document.getElementById('createdUsername').textContent = username;
+                document.getElementById('loginAltPrompt').textContent = 'Already approved?';
+                const success = document.getElementById('signupSuccess');
+                success.hidden = false;
+                success.focus();
+            } catch (error) {
+                showError(error.message || 'Unable to create your account. Check your connection and try again.', usernameInput);
+            } finally {
+                signupButton.disabled = false;
+                signupButton.textContent = 'Sign Up';
+                signupForm.removeAttribute('aria-busy');
+            }
+        });
+    </script>
+</body>
+</html>

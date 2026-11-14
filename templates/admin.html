@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260901-7">
+    <link rel="stylesheet" href="/static/css/style.css?v=20261114-3">
 </head>
 <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -24,6 +24,7 @@
                 <button type="button" id="tab-button-events" class="btn btn-ghost tab-btn" role="tab" aria-selected="false" aria-controls="tab-events" tabindex="-1" data-tab="events" onclick="switchTab('events')">Manage Events</button>
                 <button type="button" id="tab-button-announcements" class="btn btn-ghost tab-btn" role="tab" aria-selected="false" aria-controls="tab-announcements" tabindex="-1" data-tab="announcements" onclick="switchTab('announcements')">Announcements</button>
                 <button type="button" id="tab-button-users" class="btn btn-ghost tab-btn" role="tab" aria-selected="false" aria-controls="tab-users" tabindex="-1" data-tab="users" onclick="switchTab('users')">Manage Tutors</button>
+                <button type="button" id="tab-button-approvals" class="btn btn-ghost tab-btn" role="tab" aria-selected="false" aria-controls="tab-approvals" tabindex="-1" data-tab="approvals" onclick="switchTab('approvals')">Approvals <span class="tab-count" id="pendingCount" hidden></span></button>
                 <button type="button" id="tab-button-hours" class="btn btn-ghost tab-btn" role="tab" aria-selected="false" aria-controls="tab-hours" tabindex="-1" data-tab="hours" onclick="switchTab('hours')">Hours</button>
                 <button type="button" id="tab-button-roles" class="btn btn-ghost tab-btn" role="tab" aria-selected="false" aria-controls="tab-roles" tabindex="-1" data-tab="roles" onclick="switchTab('roles')">Roles</button>
             </div>
@@ -125,6 +126,15 @@
             <div class="users-list" id="usersList" aria-busy="true"><p class="loading-status" role="status">Loading tutors…</p></div>
         </section>
 
+        <section id="tab-approvals" class="tab-content" role="tabpanel" aria-labelledby="tab-button-approvals" tabindex="0" hidden>
+            <div class="page-header">
+                <h1>Account Approvals</h1>
+                <p class="text-muted">People who signed up themselves can't sign in until you accept them here. Denying a request deletes it.</p>
+            </div>
+
+            <div id="pendingList" aria-busy="true"><p class="loading-status" role="status">Loading sign-up requests…</p></div>
+        </section>
+
         <section id="tab-announcements" class="tab-content" role="tabpanel" aria-labelledby="tab-button-announcements" tabindex="0" hidden>
             <div class="page-header">
                 <h1>Announcements</h1>
@@ -153,46 +163,66 @@
                 <h1>Hour Tracker</h1>
             </div>
 
-            <div class="create-user-card">
-                <h3>Log Hours</h3>
-                <form id="logHoursForm">
-                    <div class="form-row">
-                        <div class="form-group form-group-tutor-select">
-                            <span class="field-label" id="hrTutorSelectLabel">Tutors</span>
-                            <div class="multi-select" id="hrTutorSelect">
-                                <button type="button" class="multi-select-toggle" id="hrTutorToggle" aria-labelledby="hrTutorSelectLabel hrTutorLabel" aria-haspopup="true" aria-expanded="false" aria-controls="hrTutorDropdown" onclick="toggleMultiSelect()">
-                                    <span id="hrTutorLabel">Select tutors...</span>
-                                    <span aria-hidden="true">▾</span>
-                                </button>
-                                <div class="multi-select-dropdown" id="hrTutorDropdown" role="group" aria-label="Tutor choices"></div>
+            <div class="hours-layout">
+                <div class="create-user-card hours-layout-form">
+                    <h3>Log Hours</h3>
+                    <form id="logHoursForm">
+                        <div class="form-row">
+                            <div class="form-group form-group-tutor-select">
+                                <span class="field-label" id="hrTutorSelectLabel">Tutors</span>
+                                <div class="multi-select" id="hrTutorSelect">
+                                    <button type="button" class="multi-select-toggle" id="hrTutorToggle" aria-labelledby="hrTutorSelectLabel hrTutorLabel" aria-haspopup="true" aria-expanded="false" aria-controls="hrTutorDropdown" onclick="toggleMultiSelect()">
+                                        <span id="hrTutorLabel">Select tutors...</span>
+                                        <span aria-hidden="true">▾</span>
+                                    </button>
+                                    <div class="multi-select-dropdown" id="hrTutorDropdown" role="group" aria-label="Tutor choices"></div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="hrDate">Date</label>
+                                <input type="date" id="hrDate" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="hrHours">Hours</label>
+                                <input type="number" id="hrHours" required min="0.25" step="0.25" placeholder="e.g. 1.5">
                             </div>
                         </div>
-                        <div class="form-group">
-                            <label for="hrDate">Date</label>
-                            <input type="date" id="hrDate" required>
+                        <div class="form-row form-row-spaced hours-details-row">
+                            <div class="form-group">
+                                <label for="hrLocation">Location</label>
+                                <select id="hrLocation" class="select-input" required>
+                                    <option value="">Select location...</option>
+                                </select>
+                            </div>
+                            <div class="form-group form-group-description">
+                                <label for="hrDesc">Description <span class="text-muted">(optional)</span></label>
+                                <input type="text" id="hrDesc" placeholder="e.g. Tutoring session, Training, etc.">
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label for="hrHours">Hours</label>
-                            <input type="number" id="hrHours" required min="0.25" step="0.25" placeholder="e.g. 1.5">
-                        </div>
-                    </div>
-                    <div class="form-group form-group-spaced">
-                        <label for="hrDesc">Description <span class="text-muted">(optional)</span></label>
-                        <input type="text" id="hrDesc" placeholder="e.g. Tutoring session, Training, etc.">
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-log-hours">Log Hours</button>
-                </form>
-                <div id="hrMsg" class="msg is-hidden" role="status" aria-live="polite"></div>
-            </div>
+                        <button type="submit" class="btn btn-primary btn-log-hours">Log Hours</button>
+                    </form>
+                    <div id="hrMsg" class="msg is-hidden" role="status" aria-live="polite"></div>
+                </div>
 
-            <div class="hours-filter">
-                <label class="hours-filter-label" for="hrFilter">Filter by tutor</label>
-                <select id="hrFilter" class="select-input hours-filter-select">
-                    <option value="">All Tutors</option>
-                </select>
-            </div>
+                <aside class="hours-totals" aria-labelledby="hours-totals-heading">
+                    <div class="hours-totals-header">
+                        <h3 id="hours-totals-heading">Hours by Tutor</h3>
+                        <p class="hours-totals-caption">Cumulative totals by location. Select a tutor to filter the log.</p>
+                    </div>
+                    <div id="hoursTotals" class="hours-totals-body" aria-busy="true"><p class="loading-status" role="status">Loading totals…</p></div>
+                </aside>
 
-            <div id="hoursList" aria-busy="true"><p class="loading-status" role="status">Loading hours…</p></div>
+                <div class="hours-layout-log">
+                    <div class="hours-filter">
+                        <label class="hours-filter-label" for="hrFilter">Filter by tutor</label>
+                        <select id="hrFilter" class="select-input hours-filter-select">
+                            <option value="">All Tutors</option>
+                        </select>
+                    </div>
+
+                    <div id="hoursList" aria-busy="true"><p class="loading-status" role="status">Loading hours…</p></div>
+                </div>
+            </div>
         </section>
 
         <section id="tab-roles" class="tab-content" role="tabpanel" aria-labelledby="tab-button-roles" tabindex="0" hidden>
@@ -233,6 +263,15 @@
                 weekday: 'long',
                 month: 'long',
                 day: 'numeric',
+            });
+        }
+
+        function formatShortDate(dateStr) {
+            return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
             });
         }
 
@@ -322,9 +361,16 @@
             button.classList.add('active');
             button.setAttribute('aria-selected', 'true');
             button.tabIndex = 0;
+            // On phones the tab bar scrolls sideways; keep the selected tab in view.
+            const tabList = button.parentElement;
+            tabList.scrollLeft += button.getBoundingClientRect().left - tabList.getBoundingClientRect().left
+                - (tabList.clientWidth - button.offsetWidth) / 2;
+            // The Hours tab shows the log and the totals side by side, so it gets a wider page.
+            document.getElementById('main-content').classList.toggle('container-wide', tab === 'hours');
             if (tab === 'schedule') loadAdminEvents();
             if (tab === 'events') loadEventList();
             if (tab === 'users') loadUsers();
+            if (tab === 'approvals') loadPendingUsers();
             if (tab === 'announcements') loadAnnouncements();
             if (tab === 'hours') { loadHoursTutorDropdowns(); loadHours(); }
             if (tab === 'roles') loadRoles();
@@ -727,6 +773,76 @@
             loadUsers();
         }
 
+        let pendingUsers = [];
+
+        function updatePendingCount() {
+            const badge = document.getElementById('pendingCount');
+            badge.hidden = pendingUsers.length === 0;
+            badge.textContent = pendingUsers.length;
+            badge.setAttribute('aria-label', `${pendingUsers.length} waiting`);
+        }
+
+        async function loadPendingUsers() {
+            const container = document.getElementById('pendingList');
+            container.setAttribute('aria-busy', 'true');
+            try {
+                const res = await fetch('/api/admin/pending-users', {
+                    headers: { 'Authorization': 'Bearer ' + token },
+                });
+                if (res.status === 401 || res.status === 403) { logout(); return; }
+                if (!res.ok) throw new Error('Unable to load sign-up requests.');
+                pendingUsers = await res.json();
+                updatePendingCount();
+                container.removeAttribute('aria-busy');
+                if (pendingUsers.length === 0) {
+                    container.innerHTML = '<p class="text-muted">No accounts are waiting for approval.</p>';
+                    return;
+                }
+                let html = '<div class="roles-list">';
+                pendingUsers.forEach(pending => {
+                    const name = escapeHtml(pending.username);
+                    html += `<div class="role-item pending-item">
+                        <div class="pending-details">
+                            <span class="role-name">${name}</span>
+                            <span class="pending-requested">Requested ${escapeHtml(String(pending.created_at).split(/[ T]/)[0])}</span>
+                        </div>
+                        <span class="inline-actions">
+                            <button type="button" class="btn btn-danger-ghost btn-save-ghost" aria-label="Accept ${name}" onclick="reviewPendingUser(${pending.id}, true)">Accept</button>
+                            <button type="button" class="btn btn-danger-ghost" aria-label="Deny ${name}" onclick="reviewPendingUser(${pending.id}, false)">Deny</button>
+                        </span>
+                    </div>`;
+                });
+                html += '</div>';
+                container.innerHTML = html;
+            } catch (error) {
+                showLoadError(container, error.message || 'Unable to load sign-up requests.', loadPendingUsers);
+            }
+        }
+
+        async function reviewPendingUser(id, accept) {
+            const pending = pendingUsers.find(item => item.id === id);
+            if (!pending) return;
+            if (!accept && !confirm(`Deny ${pending.username}? Their sign-up request will be deleted.`)) return;
+            try {
+                const res = await fetch(`/api/admin/pending-users/${id}${accept ? '/approve' : ''}`, {
+                    method: accept ? 'POST' : 'DELETE',
+                    headers: { 'Authorization': 'Bearer ' + token },
+                });
+                if (res.status === 401 || res.status === 403) { logout(); return; }
+                // 404 means another admin already handled this request, so just refresh.
+                if (!res.ok && res.status !== 404) {
+                    const data = await res.json().catch(() => ({}));
+                    alert(typeof data.detail === 'string' ? data.detail : 'Unable to update this request.');
+                    return;
+                }
+                if (res.ok) announce(`${pending.username} was ${accept ? 'accepted and can now sign in' : 'denied'}.`);
+            } catch {
+                alert('Unable to update this request. Check your connection and try again.');
+                return;
+            }
+            loadPendingUsers();
+        }
+
         async function loadAnnouncements() {
             const container = document.getElementById('annList');
             container.setAttribute('aria-busy', 'true');
@@ -789,8 +905,34 @@
         }
 
         let allHours = [];
+        let hoursLoaded = false;
+        let hourLocations = [];
+        let hourTutors = [];
 
         let hrSelectedTutors = new Set();
+
+        function hourLocationOptions(selectedLocation, emptyLabel) {
+            return `<option value="">${emptyLabel}</option>` + hourLocations.map(location => {
+                const safeLocation = escapeHtml(location);
+                const selected = location === selectedLocation ? ' selected' : '';
+                return `<option value="${safeLocation}"${selected}>${safeLocation}</option>`;
+            }).join('');
+        }
+
+        async function loadHourLocations() {
+            if (hourLocations.length > 0) return;
+            const res = await fetch('/api/hour-locations', {
+                headers: { 'Authorization': 'Bearer ' + token },
+            });
+            if (res.status === 401 || res.status === 403) { logout(); return; }
+            if (!res.ok) throw new Error('Unable to load locations.');
+            hourLocations = await res.json();
+            document.getElementById('hrLocation').innerHTML = hourLocationOptions('', 'Select location...');
+        }
+
+        function formatHours(value) {
+            return String(Number(value.toFixed(2)));
+        }
 
         function toggleMultiSelect() {
             const dd = document.getElementById('hrTutorDropdown');
@@ -849,6 +991,7 @@
             });
             const users = await res.json();
             const tutors = users.filter(u => !u.is_admin);
+            hourTutors = tutors;
             const dd = document.getElementById('hrTutorDropdown');
             const filt = document.getElementById('hrFilter');
             const curFilt = filt.value;
@@ -868,22 +1011,97 @@
                 filt.innerHTML += `<option value="${u.id}">${escapeHtml(u.display_name)}</option>`;
             });
             filt.value = curFilt;
+            renderHoursTotals();
         }
 
         async function loadHours() {
             const container = document.getElementById('hoursList');
             container.setAttribute('aria-busy', 'true');
             try {
-                const res = await fetch('/api/admin/hours', {
-                    headers: { 'Authorization': 'Bearer ' + token }
-                });
+                const [res] = await Promise.all([
+                    fetch('/api/admin/hours', {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    }),
+                    loadHourLocations(),
+                ]);
                 if (res.status === 401 || res.status === 403) { logout(); return; }
                 if (!res.ok) throw new Error('Unable to load hours.');
                 allHours = await res.json();
+                hoursLoaded = true;
                 renderHours();
+                renderHoursTotals();
             } catch (error) {
                 showLoadError(container, error.message || 'Unable to load hours.', loadHours);
+                const totals = document.getElementById('hoursTotals');
+                totals.removeAttribute('aria-busy');
+                totals.innerHTML = '<p class="text-muted hours-totals-empty">Totals are unavailable.</p>';
             }
+        }
+
+        // One row per tutor, one column per location; each cell is that tutor's
+        // cumulative hours at that location across every logged entry.
+        function renderHoursTotals() {
+            if (!hoursLoaded) return;
+            const container = document.getElementById('hoursTotals');
+            container.removeAttribute('aria-busy');
+
+            const NO_LOCATION = '';
+            const rows = new Map();
+            const rowFor = (id, name, selectable) => {
+                if (!rows.has(id)) rows.set(id, { id, name, selectable, byLocation: {}, total: 0 });
+                return rows.get(id);
+            };
+            hourTutors.forEach(tutor => rowFor(tutor.id, tutor.display_name, true));
+            allHours.forEach(entry => {
+                const row = rowFor(entry.user_id, entry.display_name, false);
+                const location = hourLocations.includes(entry.location) ? entry.location : NO_LOCATION;
+                row.byLocation[location] = (row.byLocation[location] || 0) + entry.hours;
+                row.total += entry.hours;
+            });
+
+            if (rows.size === 0) {
+                container.innerHTML = '<p class="text-muted hours-totals-empty">No tutors yet.</p>';
+                return;
+            }
+
+            // Entries logged before locations existed get their own column until they are assigned.
+            const columns = hourLocations.map(location => ({ key: location, label: location }));
+            if (allHours.some(entry => !hourLocations.includes(entry.location))) {
+                columns.push({ key: NO_LOCATION, label: 'No location' });
+            }
+
+            const sortedRows = Array.from(rows.values()).sort((a, b) => a.name.localeCompare(b.name));
+            const selectedId = document.getElementById('hrFilter').value;
+            const cell = (value, tag = 'td', className = '') => value > 0
+                ? `<${tag} class="${className}">${formatHours(value)}</${tag}>`
+                : `<${tag} class="${className} hours-totals-zero"><span aria-hidden="true">–</span><span class="sr-only">0</span></${tag}>`;
+
+            let html = '<div class="hours-totals-scroll"><table class="hours-totals-table"><thead><tr><th scope="col">Tutor</th>';
+            html += columns.map(column => `<th scope="col">${escapeHtml(column.label)}</th>`).join('');
+            html += '<th scope="col">Total</th></tr></thead><tbody>';
+
+            sortedRows.forEach(row => {
+                const isSelected = String(row.id) === selectedId;
+                const name = escapeHtml(row.name);
+                html += `<tr class="${isSelected ? 'is-selected' : ''}"><th scope="row">${row.selectable
+                    ? `<button type="button" class="hours-totals-name" aria-pressed="${isSelected}" onclick="filterHoursByTutor(${row.id})">${name}</button>`
+                    : name}</th>`;
+                html += columns.map(column => cell(row.byLocation[column.key] || 0)).join('');
+                html += cell(row.total, 'td', 'hours-totals-total') + '</tr>';
+            });
+
+            html += '</tbody><tfoot><tr><th scope="row">All tutors</th>';
+            html += columns.map(column => cell(sortedRows.reduce((sum, row) => sum + (row.byLocation[column.key] || 0), 0))).join('');
+            html += cell(sortedRows.reduce((sum, row) => sum + row.total, 0), 'td', 'hours-totals-total');
+            html += '</tr></tfoot></table></div>';
+            container.innerHTML = html;
+        }
+
+        function filterHoursByTutor(id) {
+            const filter = document.getElementById('hrFilter');
+            filter.value = filter.value === String(id) ? '' : String(id);
+            renderHours();
+            renderHoursTotals();
         }
 
         function renderHours() {
@@ -905,14 +1123,15 @@
             </div>`;
 
             html += '<div class="users-table table-spaced" role="table" aria-label="Logged hours"><div class="table-header table-hours" role="row">';
-            html += '<span role="columnheader">Tutor</span><span role="columnheader">Date</span><span role="columnheader">Hours</span><span role="columnheader">Description</span><span role="columnheader">Actions</span>';
+            html += '<span role="columnheader">Tutor</span><span role="columnheader">Date</span><span role="columnheader">Hours</span><span role="columnheader">Location</span><span role="columnheader">Description</span><span role="columnheader">Actions</span>';
             html += '</div>';
 
             filtered.forEach(h => {
                 html += `<div class="table-row table-hours" role="row" id="hour-row-${h.id}">
                     <span class="user-name" role="cell" data-label="Tutor">${escapeHtml(h.display_name)}</span>
-                    <span role="cell" data-label="Date">${formatDate(h.work_date)}</span>
+                    <span role="cell" data-label="Date">${formatShortDate(h.work_date)}</span>
                     <span role="cell" data-label="Hours">${h.hours}</span>
+                    <span role="cell" data-label="Location">${h.location ? escapeHtml(h.location) : '<span class="text-muted">—</span>'}</span>
                     <span class="text-muted" role="cell" data-label="Description">${escapeHtml(h.description || '—')}</span>
                     <span class="inline-actions" role="cell" data-label="Actions">
                         <button type="button" class="btn btn-danger-ghost btn-secondary-ghost" onclick="editHour(${h.id})">Edit</button>
@@ -924,7 +1143,10 @@
             container.innerHTML = html;
         }
 
-        document.getElementById('hrFilter').addEventListener('change', renderHours);
+        document.getElementById('hrFilter').addEventListener('change', () => {
+            renderHours();
+            renderHoursTotals();
+        });
 
         document.getElementById('logHoursForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -935,16 +1157,22 @@
                 return;
             }
             msgEl.classList.add('is-hidden');
-            await fetch('/api/admin/hours', {
+            const res = await fetch('/api/admin/hours', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
                 body: JSON.stringify({
                     user_ids: Array.from(hrSelectedTutors),
                     work_date: document.getElementById('hrDate').value,
                     hours: parseFloat(document.getElementById('hrHours').value),
+                    location: document.getElementById('hrLocation').value,
                     description: document.getElementById('hrDesc').value,
                 }),
             });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                showMsg(msgEl, false, typeof data.detail === 'string' ? data.detail : 'Failed to log hours');
+                return;
+            }
             document.getElementById('logHoursForm').reset();
             hrSelectedTutors.clear();
             updateTutorLabel();
@@ -959,6 +1187,7 @@
                 <span class="user-name" role="cell" data-label="Tutor">${escapeHtml(h.display_name)}</span>
                 <span role="cell" data-label="Date"><input type="date" id="editDate-${id}" value="${h.work_date}" class="inline-edit-input" aria-label="Work date"></span>
                 <span role="cell" data-label="Hours"><input type="number" id="editHours-${id}" value="${h.hours}" min="0.25" step="0.25" class="inline-edit-input inline-edit-input-hours" aria-label="Hours"></span>
+                <span role="cell" data-label="Location"><select id="editLocation-${id}" class="inline-edit-input inline-edit-input-full hours-edit-select" aria-label="Location">${hourLocationOptions(h.location || '', 'No location')}</select></span>
                 <span role="cell" data-label="Description"><input type="text" id="editDesc-${id}" value="${escapeHtml(h.description || '')}" class="inline-edit-input inline-edit-input-full" aria-label="Description"></span>
                 <span class="inline-actions" role="cell" data-label="Actions">
                     <button type="button" class="btn btn-danger-ghost btn-save-ghost" onclick="saveHour(${id})">Save</button>
@@ -969,15 +1198,21 @@
         }
 
         async function saveHour(id) {
-            await fetch(`/api/admin/hours/${id}`, {
+            const res = await fetch(`/api/admin/hours/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
                 body: JSON.stringify({
                     work_date: document.getElementById('editDate-' + id).value,
                     hours: parseFloat(document.getElementById('editHours-' + id).value),
+                    location: document.getElementById('editLocation-' + id).value || null,
                     description: document.getElementById('editDesc-' + id).value,
                 }),
             });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                alert(typeof data.detail === 'string' ? data.detail : 'Failed to update hours');
+                return;
+            }
             loadHours();
         }
 
@@ -1055,6 +1290,8 @@
 
         loadEventLocations();
         loadAdminEvents();
+        // Loaded up front so the Approvals tab can show how many requests are waiting.
+        loadPendingUsers();
     </script>
 </body>
 </html>

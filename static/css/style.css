@@ -132,6 +132,46 @@ textarea {
     letter-spacing: -0.02em;
 }
 
+.login-alt {
+    margin-top: 18px;
+    color: var(--gray-600);
+    font-size: 13px;
+}
+
+.login-alt a {
+    color: var(--green-700);
+    font-weight: 600;
+}
+
+.signup-notice {
+    margin-bottom: 16px;
+    padding: 10px 12px;
+    background: var(--green-50);
+    border-left: 3px solid var(--green-600);
+    color: var(--gray-700);
+    font-size: 13px;
+    text-align: left;
+}
+
+.signup-success {
+    padding: 16px;
+    background: var(--green-50);
+    border-left: 3px solid var(--green-600);
+    color: var(--gray-700);
+    font-size: 14px;
+    text-align: left;
+}
+
+.signup-success h2 {
+    margin-bottom: 6px;
+    color: var(--green-700);
+    font-size: 16px;
+}
+
+.signup-success strong {
+    overflow-wrap: anywhere;
+}
+
 .form-group {
     text-align: left;
     margin-bottom: 16px;
@@ -1038,6 +1078,43 @@ textarea {
     cursor: not-allowed;
 }
 
+.pending-item {
+    gap: 12px;
+}
+
+.pending-details {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.pending-details .role-name {
+    overflow-wrap: anywhere;
+}
+
+.pending-requested {
+    color: var(--gray-500);
+    font-size: 12px;
+}
+
+.pending-item .inline-actions {
+    flex: 0 0 auto;
+}
+
+.tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    padding: 1px 5px;
+    border-radius: 9px;
+    background: var(--green-600);
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 16px;
+}
+
 .nav-hours-badge {
     display: inline-flex;
     align-items: center;
@@ -1210,7 +1287,222 @@ textarea {
 }
 
 .table-hours {
-    grid-template-columns: 1fr 1fr 0.5fr 1.5fr 120px;
+    grid-template-columns: 1.2fr 1.1fr 0.45fr 1.2fr 1.2fr 130px;
+    column-gap: 8px;
+}
+
+.hours-details-row {
+    margin-bottom: 16px;
+}
+
+.form-row .form-group-description {
+    flex: 2;
+}
+
+.hours-edit-select {
+    background: white;
+}
+
+/* Hours tab: the log on the left, cumulative totals per tutor on the right. */
+.hours-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.hours-layout > * {
+    min-width: 0;
+}
+
+.hours-totals {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 32px;
+    background: white;
+    border: 1px solid var(--gray-200);
+}
+
+.hours-totals-header {
+    padding: 16px 16px 12px;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.hours-totals-header h3 {
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.hours-totals-caption {
+    margin-top: 2px;
+    color: var(--gray-500);
+    font-size: 12px;
+}
+
+.hours-totals-body {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.hours-totals-body .loading-status,
+.hours-totals-empty {
+    padding: 14px 16px;
+}
+
+.hours-totals-scroll {
+    /* Positioned so the visually hidden "0" labels are clipped with the table
+       instead of widening the page when the table scrolls sideways. */
+    position: relative;
+    max-height: 400px;
+    overflow: auto;
+}
+
+.hours-totals-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+}
+
+.hours-totals-table th,
+.hours-totals-table td {
+    padding: 6px;
+    border-bottom: 1px solid var(--gray-100);
+    text-align: right;
+    font-weight: 400;
+    overflow-wrap: normal;
+}
+
+/* The tutor column stays put when a narrow screen scrolls the locations sideways. */
+.hours-totals-table th:first-child {
+    position: sticky;
+    left: 0;
+    min-width: 96px;
+    padding-left: 16px;
+    background: white;
+    text-align: left;
+}
+
+.hours-totals-table thead th:first-child,
+.hours-totals-table tfoot th:first-child {
+    z-index: 2;
+    background: var(--gray-50);
+}
+
+.hours-totals-table th:last-child,
+.hours-totals-table td:last-child {
+    padding-right: 16px;
+}
+
+.hours-totals-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    background: var(--gray-50);
+    border-bottom-color: var(--gray-200);
+    color: var(--gray-500);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    line-height: 1.25;
+    text-transform: uppercase;
+    vertical-align: bottom;
+}
+
+.hours-totals-table tbody th {
+    font-weight: 600;
+}
+
+.hours-totals-table tbody tr:last-child > * {
+    border-bottom: 0;
+}
+
+.hours-totals-table tbody tr:hover > * {
+    background: var(--gray-50);
+}
+
+.hours-totals-table tbody tr.is-selected > * {
+    background: var(--green-50);
+}
+
+.hours-totals-table tbody tr.is-selected > th {
+    box-shadow: inset 3px 0 0 var(--green-600);
+}
+
+.hours-totals-name {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.hours-totals-name:hover,
+.hours-totals-name[aria-pressed="true"] {
+    color: var(--green-700);
+}
+
+.hours-totals-table .hours-totals-zero {
+    color: var(--gray-300);
+}
+
+.hours-totals-table .hours-totals-total {
+    color: var(--green-700);
+    font-weight: 700;
+}
+
+.hours-totals-table tfoot th,
+.hours-totals-table tfoot td {
+    position: sticky;
+    bottom: 0;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    background: var(--gray-50);
+    border-top: 1px solid var(--gray-200);
+    border-bottom: 0;
+    font-weight: 700;
+}
+
+@media (min-width: 1320px) {
+    .container.container-wide {
+        max-width: 1420px;
+    }
+
+    .hours-layout {
+        grid-template-columns: minmax(0, 1fr) 440px;
+        grid-template-rows: auto 1fr;
+        column-gap: 24px;
+        align-items: start;
+    }
+
+    .hours-layout-form {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .hours-layout-log {
+        grid-column: 1;
+        grid-row: 2;
+    }
+
+    .hours-totals {
+        position: sticky;
+        top: 84px;
+        grid-column: 2;
+        grid-row: 1 / span 2;
+        /* Sized from where the panel starts, so the totals row is visible before scrolling. */
+        max-height: calc(100vh - 176px);
+        margin-bottom: 0;
+    }
+
+    .hours-totals-scroll {
+        max-height: none;
+        min-height: 0;
+    }
 }
 
 .hours-list {
@@ -1330,6 +1622,13 @@ textarea {
 
     .login-card {
         padding: 20px 8px 24px;
+    }
+
+    /* A bigger tap area for the sign in / sign up link without moving the text. */
+    .login-alt a {
+        display: inline-block;
+        margin: -12px 0;
+        padding: 12px 8px;
     }
 
     .text-muted,
@@ -1579,6 +1878,18 @@ textarea {
         min-width: 0;
     }
 
+    .hours-details-row {
+        margin-bottom: 0;
+    }
+
+    .hours-totals {
+        margin-bottom: 24px;
+    }
+
+    .hours-totals-name {
+        padding: 12px 0;
+    }
+
     .hours-summary,
     .hours-entry,
     .role-item {
@@ -1622,8 +1933,21 @@ textarea {
     }
 
     .multi-select-item input[type="checkbox"] {
+        flex: 0 0 auto;
         width: 20px;
         height: 20px;
+        /* Undo the tall text-field minimum so the box lines up with its name. */
+        min-height: 0;
+    }
+
+    .distance-toggle {
+        min-height: 44px;
+        padding-right: 14px;
+        padding-left: 14px;
+    }
+
+    .hours-totals-scroll {
+        max-height: min(60vh, 520px);
     }
 
     .users-table {
@@ -1691,9 +2015,23 @@ textarea {
         width: 100%;
     }
 
-    .event-edit-details,
-    .event-table-details {
-        flex-wrap: wrap;
+    /* These cells stack two values, so the label sits beside them in its own column. */
+    .table-row > .event-edit-details,
+    .table-row > .event-table-details {
+        display: grid;
+        grid-template-columns: 92px minmax(0, 1fr);
+        gap: 6px 12px;
+    }
+
+    .table-row > .event-edit-details::before,
+    .table-row > .event-table-details::before {
+        grid-row: 1 / span 2;
+    }
+
+    .table-row > .event-edit-details > *,
+    .table-row > .event-table-details > * {
+        grid-column: 2;
+        margin-top: 0;
     }
 }
 
@@ -1707,6 +2045,12 @@ textarea {
         flex: 1 1 100%;
         justify-content: flex-end;
         flex-wrap: wrap;
+    }
+
+    /* The name is already on the title card just below; dropping it here keeps
+       the sticky header to two rows instead of three. */
+    .nav-user {
+        display: none;
     }
 
     .modal-dialog {
@@ -1753,6 +2097,21 @@ textarea {
 
     .table-row > [role="cell"]::before {
         flex-basis: auto;
+    }
+
+    .table-row > .event-edit-details,
+    .table-row > .event-table-details {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .table-row > .event-edit-details::before,
+    .table-row > .event-table-details::before {
+        grid-row: auto;
+    }
+
+    .table-row > .event-edit-details > *,
+    .table-row > .event-table-details > * {
+        grid-column: 1;
     }
 }
 

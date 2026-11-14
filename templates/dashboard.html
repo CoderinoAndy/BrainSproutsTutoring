@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260901-5">
+    <link rel="stylesheet" href="/static/css/style.css?v=20261114-3">
 </head>
 <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -434,7 +434,7 @@
                     html += `<article class="hours-entry">
                         <div class="hours-entry-info">
                             <h3 class="event-date">${formatDate(h.work_date)}</h3>
-                            <p class="event-time">${escapeHtml(h.description || 'No description')}</p>
+                            <p class="event-time">${escapeHtml([h.location, h.description].filter(Boolean).join(' · ') || 'No description')}</p>
                         </div>
                         <strong class="hours-entry-value"><span class="sr-only">Hours: </span>${h.hours}h</strong>
                     </article>`;
