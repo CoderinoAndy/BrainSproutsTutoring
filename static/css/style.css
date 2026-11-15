@@ -1387,9 +1387,23 @@ textarea {
 }
 
 .hours-totals-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px 16px;
     padding: 16px 16px 12px;
     border-bottom: 1px solid var(--gray-200);
 }
+
+.hours-totals-download {
+    flex-shrink: 0;
+    padding: 8px 14px;
+    font-size: 13px;
+}
+
+.hours-totals-download:hover { background: var(--gray-50); }
+.hours-totals-download:disabled { opacity: 0.6; cursor: wait; }
 
 .hours-totals-header h3 {
     font-size: 15px;

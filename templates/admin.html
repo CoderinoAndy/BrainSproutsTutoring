@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=20261114-6">
+    <link rel="stylesheet" href="/static/css/style.css?v=20261115-1">
 </head>
 <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -215,8 +215,11 @@
 
                 <aside class="hours-totals" aria-labelledby="hours-totals-heading">
                     <div class="hours-totals-header">
-                        <h3 id="hours-totals-heading">Hours by Tutor</h3>
-                        <p class="hours-totals-caption">Cumulative totals by location. Select a tutor to filter the log.</p>
+                        <div>
+                            <h3 id="hours-totals-heading">Hours by Tutor</h3>
+                            <p class="hours-totals-caption">Cumulative totals by location. Select a tutor to filter the log.</p>
+                        </div>
+                        <button type="button" id="hoursPdfButton" class="btn btn-secondary hours-totals-download" onclick="downloadHoursPdf()">Download PDF</button>
                     </div>
                     <div id="hoursTotals" class="hours-totals-body" aria-busy="true"><p class="loading-status" role="status">Loading totals…</p></div>
                 </aside>
@@ -1184,6 +1187,35 @@
             html += cell(sortedRows.reduce((sum, row) => sum + row.total, 0), 'td', 'hours-totals-total');
             html += '</tr></tfoot></table></div>';
             container.innerHTML = html;
+        }
+
+        // The PDF is built by the server from the same data as the table, for every tutor.
+        async function downloadHoursPdf() {
+            const button = document.getElementById('hoursPdfButton');
+            button.disabled = true;
+            button.textContent = 'Preparing PDF…';
+            try {
+                const res = await fetch('/api/admin/hours/totals.pdf', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                if (res.status === 401 || res.status === 403) { logout(); return; }
+                if (!res.ok) throw new Error('Unable to create the PDF.');
+                const disposition = res.headers.get('Content-Disposition') || '';
+                const url = URL.createObjectURL(await res.blob());
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = disposition.match(/filename="([^"]+)"/)?.[1] || 'brainsprouts-hours-by-tutor.pdf';
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+                announce('Hours by tutor PDF downloaded.');
+            } catch (error) {
+                alert('Unable to download the PDF. Please try again.');
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Download PDF';
+            }
         }
 
         function filterHoursByTutor(id) {

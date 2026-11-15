@@ -1,16 +1,20 @@
 import os
 import secrets
 import sqlite3
-from datetime import datetime, timedelta
+import unicodedata
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import urlencode
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import bcrypt
 import jwt
 from fastapi import Depends, FastAPI, Header, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
+from fpdf import FPDF
+from fpdf.fonts import FontFace
 from pydantic import BaseModel
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -42,6 +46,8 @@ HOUR_LOCATIONS = [
     "Northern Lights P.S.",
     "CICS",
 ]
+# Column for hours logged before locations existed and not yet assigned to one.
+NO_HOUR_LOCATION = "No location"
 
 HIGH_SCHOOLS = [
     (
@@ -1048,6 +1054,123 @@ def my_hours(db: Db, user: User):
 def all_hours(db: Db, _admin: Admin):
     return db.execute("""SELECT h.id, h.user_id, h.work_date, h.hours, h.description, h.location, h.created_at, u.display_name
         FROM hours h JOIN users u ON h.user_id = u.id ORDER BY h.work_date DESC, u.display_name""").fetchall()
+
+
+def hours_totals(db: Database) -> tuple[list[str], list[dict]]:
+    """Cumulative hours per tutor and location, as the admin "Hours by Tutor" table shows them."""
+    def new_row(name):
+        return {"name": name, "by_location": {}, "total": 0.0}
+
+    # Every tutor gets a row, even with nothing logged yet.
+    rows = {user["id"]: new_row(user["display_name"])
+            for user in list_users(db, {}) if not user["is_admin"]}
+    columns = list(HOUR_LOCATIONS)
+    for entry in all_hours(db, {}):
+        row = rows.setdefault(entry["user_id"], new_row(entry["display_name"]))
+        location = entry["location"] if entry["location"] in HOUR_LOCATIONS else NO_HOUR_LOCATION
+        if location not in columns:
+            columns.append(location)
+        row["by_location"][location] = row["by_location"].get(location, 0.0) + entry["hours"]
+        row["total"] += entry["hours"]
+    return columns, sorted(rows.values(), key=lambda row: row["name"].casefold())
+
+
+def pdf_text(value: str) -> str:
+    """The PDF's built-in fonts only cover Latin-1, so reduce other characters to their closest match."""
+    def latin1(char):
+        if ord(char) < 256:
+            return char
+        return unicodedata.normalize("NFKD", char).encode("latin-1", "ignore").decode("latin-1") or "?"
+    return "".join(latin1(char) for char in value)
+
+
+def report_date() -> date:
+    try:
+        return datetime.now(ZoneInfo("America/Toronto")).date()
+    except ZoneInfoNotFoundError:
+        # Windows has no timezone database unless the tzdata package is installed.
+        return datetime.now().date()
+
+
+class HoursReport(FPDF):
+    def footer(self):
+        self.set_y(-12)
+        self.set_font("Helvetica", size=8)
+        self.set_text_color(113, 113, 122)
+        self.cell(0, 5, f"Page {self.page_no()} of {{nb}}", align="C")
+
+
+def hours_totals_pdf(columns: list[str], rows: list[dict], generated: date) -> bytes:
+    green = (22, 101, 52)
+    gray = (113, 113, 122)
+    black = (24, 24, 27)
+
+    pdf = HoursReport(format="Letter")
+    pdf.set_title("BrainSprouts Hours by Tutor")
+    pdf.set_margins(15, 15)
+    pdf.set_auto_page_break(True, margin=18)
+    pdf.add_page()
+
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.set_text_color(*green)
+    pdf.cell(0, 5, "BrainSprouts", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.set_text_color(*black)
+    pdf.cell(0, 9, "Hours by Tutor", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("Helvetica", size=9)
+    pdf.set_text_color(*gray)
+    pdf.cell(0, 5, f"Cumulative hours by location. Generated {generated:%B} {generated.day}, {generated.year}.",
+             new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(5)
+
+    def hours_cell(table_row, value, bold=False):
+        if value > 0:
+            text = f"{value:.2f}".rstrip("0").rstrip(".")
+            table_row.cell(text, style=FontFace(emphasis="BOLD" if bold else "", color=black))
+        else:
+            table_row.cell("-", style=FontFace(color=(161, 161, 170)))
+
+    pdf.set_font("Helvetica", size=9)
+    pdf.set_text_color(*black)
+    pdf.set_draw_color(212, 212, 216)
+    number_columns = len(columns) + 1
+    with pdf.table(
+        col_widths=(3, *[1.3] * number_columns),
+        text_align=("LEFT", *["RIGHT"] * number_columns),
+        headings_style=FontFace(emphasis="BOLD", color=(255, 255, 255), fill_color=green),
+        borders_layout="HORIZONTAL_LINES",
+        line_height=4.5,
+        padding=(1.6, 2),
+    ) as table:
+        heading = table.row()
+        for label in ("Tutor", *columns, "Total"):
+            heading.cell(label)
+
+        if not rows:
+            table.row().cell("No tutors yet.", colspan=number_columns + 1, style=FontFace(color=gray))
+        for row in rows:
+            table_row = table.row()
+            table_row.cell(pdf_text(row["name"]))
+            for column in columns:
+                hours_cell(table_row, row["by_location"].get(column, 0))
+            hours_cell(table_row, row["total"], bold=True)
+
+        totals = table.row()
+        totals.cell("All tutors", style=FontFace(emphasis="BOLD"))
+        for column in columns:
+            hours_cell(totals, sum(row["by_location"].get(column, 0) for row in rows), bold=True)
+        hours_cell(totals, sum(row["total"] for row in rows), bold=True)
+
+    return bytes(pdf.output())
+
+
+@app.get("/api/admin/hours/totals.pdf")
+def download_hours_totals(db: Db, _admin: Admin):
+    generated = report_date()
+    columns, rows = hours_totals(db)
+    filename = f"brainsprouts-hours-by-tutor-{generated.isoformat()}.pdf"
+    return Response(hours_totals_pdf(columns, rows, generated), media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
 @app.post("/api/admin/hours")
